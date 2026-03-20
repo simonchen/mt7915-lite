@@ -4,10 +4,17 @@
 MT7915-Killer 是针对 MediaTek MT7915 (Wi-Fi 6) 芯片的深度调优驱动分支。
 本项目基于 2022 年 12 月的 [openwrt/mt76](https://github.com/openwrt/mt76) 源码，集成了截至 2026 年 3 月除 WED 外的大部分补丁，并针对 MT7621 等弱核 CPU 进行了专项定制，旨在提升性能并彻底解决长期高负载下的“老化”卡顿与重启问题。
 
-## 性能
+## 性能 (AP+Client)
 - 基准下载速率: 连续运行 ```iperf3 -R -w 1M -P1``` 17小时后
 <img width="472" height="277" alt="Perf-250M-after-17hr" src="iperf3-r-after-17hr.png" />
 
+- 重度内存回收后的恢复
+
+  重压下的韧性（运行时间超过 15 小时）：请留意在经历一段高强度内存回收期（即 V 型下探）之后的恢复表现。驱动程序从内核限流状态无缝切换回全速运行（320 Mbps），有力地证明了 NAPI 拦截机制在传统 MIPS 架构芯片上的可靠性。
+
+  <img width="384" height="199" alt="image" src="https://github.com/user-attachments/assets/de280c8f-91b2-4a06-a203-6b91bb64a4ca" />
+  <img width="384" height="190" alt="image" src="https://github.com/user-attachments/assets/fdbf2f3a-597b-4a0e-a2b4-1bb048389a05" />
+  
 ## 核心驱动优化 (Linux 5.4.268 验证)
 - 内存策略优化：将 DMA 申请从 Order-2 降级为 Order-0 (4KB) 连续物理页，从根源规避 MIPS 架构在高带宽下因内存碎裂导致的分配延迟与 OOM。
 - WIFI5 专项增强：针对 WIFI5 网卡优化 MSDU 聚合（最大 3 包），提升跨代兼容性下的稳态吞吐。
