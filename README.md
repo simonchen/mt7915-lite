@@ -7,9 +7,13 @@ MT7915-Killer is a high-performance driver branch for MediaTek MT7915 (Wi-Fi 6).
 - The base of average DL rate after continuously running ```iperf3 -R -w 1M -P1``` for 17h
 <img width="472" height="277" alt="Perf-250M-after-17hr" src="iperf3-r-after-17hr.png" />
 
-  **Note**:
+- Reovery after a heavy meory reclaim period
   Resilience Under Pressure (17h+ Runtime): Notice the recovery after a heavy memory reclaim period (V-dip). The driver seamlessly transitions from kernel-throttled state back to full speed (320Mbps), proving the reliability of the NAPI-intercept mechanism on legacy MIPS silicon.
-  
+
+  <img width="384" height="199" alt="image" src="https://github.com/user-attachments/assets/de280c8f-91b2-4a06-a203-6b91bb64a4ca" />
+  <img width="384" height="190" alt="image" src="https://github.com/user-attachments/assets/fdbf2f3a-597b-4a0e-a2b4-1bb048389a05" />
+
+
 ## Key Driver Optimizations (Linux 5.4.268)
 - Memory Optimization: Downgraded DMA allocation to Order-0 (4KB) to prevent latency and allocation failures caused by memory fragmentation on MIPS architectures.
 - WIFI5 Tuning: Optimized MSDU aggregation (Max 3 packets) for WIFI5 NICs (e.g., Killer-1535).
