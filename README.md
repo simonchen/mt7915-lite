@@ -3,7 +3,7 @@
 # mt7915-killer
 MT7915-Killer is a high-performance driver branch for MediaTek MT7915 (Wi-Fi 6). Based on [openwrt/mt76](https://github.com/openwrt/mt76) (Dec 2022) with patches up to March 2026 (excl. WED), it is specifically tuned to extract maximum performance from weak CPUs like MT7621 and eliminate long-term aging/stuttering issues.
 
-## Perfermance
+## Perfermance (AP+Client mode)
 - The base of average DL rate after continuously running ```iperf3 -R -w 1M -P1``` for 17h
 <img width="472" height="277" alt="Perf-250M-after-17hr" src="iperf3-r-after-17hr.png" />
 
