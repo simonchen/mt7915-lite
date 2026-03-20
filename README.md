@@ -33,4 +33,4 @@ MT7915-Killer is a high-performance driver branch for MediaTek MT7915 (Wi-Fi 6).
 - Metrics: Zero Dirty memory, optimized NET_RX/HRTIMER distribution.
   
 **Note:**
-  During stress testing, all `napi-workq` processes—as well as the core MT7915 driver worker process, `mt76-tx`—operated at the kernel's default priority (NICENESS 0).
+  During stress testing, all `napi-workq` processes—as well as the core MT7915 driver worker process, `mt76-tx`—operated at the kernel's default priority.
