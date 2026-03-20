@@ -32,3 +32,7 @@ MT7915-Killer 是针对 MediaTek MT7915 (Wi-Fi 6) 芯片的深度调优驱动分
 - 稳定性：12 小时+ 持续稳定在 250~300Mbps。
 - 自愈性：即便在高负载后期iperf3 (路由端）出现 Bad page state 隔离或内存同步回收，系统也能在分钟级内自动反弹。
 - 指标：Dirty memory 保持为 0kB，NET_RX/HRTIMER 软中断分布科学，高阶内存（Order 9-10）留存健康。
+
+**注意**
+
+压力测试过程中，所有 napi-workq 进程以及 MT7915 驱动核心工作进程 mt76-tx 全部保持在内核默认优先级（NICENESS 0）工作。
