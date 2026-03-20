@@ -27,7 +27,7 @@ MT7915-Killer is a high-performance driver branch for MediaTek MT7915 (Wi-Fi 6).
 - CPU0/1: Bind NAPI POLL workqueues and user-space apps.
 
 ## Stress Test Summary
-- Tested on MT7621 @880MHz with Killer-1535 NIC (PC runs on ```iperf3 -R -w 1M -P 1```)
+- Tested on MT7621 @1000MHz(Overclocking) with Killer-1535 NIC (PC runs on ```iperf3 -R -w 1M -P 1```)
 - Stability: Continuous 12h+ uptime at 250-300Mbps.
 - Resilience: Instant recovery from memory reclaim or Bad page state without hardware watchdog triggers.
 - Metrics: Zero Dirty memory, optimized NET_RX/HRTIMER distribution.
