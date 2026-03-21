@@ -6,6 +6,7 @@ MT7915-Killer is a high-performance driver branch for MediaTek MT7915 (Wi-Fi 6).
 Comparative analysis reveals that when operating with Wi-Fi 6 (MT7915), the MT7621 generates an HRTIMER count significantly higher than when operating with Wi-Fi 5 (MT7612). Through the implementation of 16 NAPI intercepts, this project aims to mitigate the risk of physical saturation within the MT7621's GIC interrupt controller and OCP bus under extremely high-frequency timer loads, thereby transforming what would otherwise be an inevitable hardware reboot into a "controllable" performance degradation.
 
 ## Perfermance (AP+Client mode)
+- The bottleneck of MT7621 is not data forwarding, but the massive HRTIMER scheduling overhead required to maintain Wi-Fi 6 RX precision under high load.
 - The base of average DL rate after continuously running ```iperf3 -R -w 1M -P1``` for 17h
 <img width="472" height="277" alt="Perf-250M-after-17hr" src="iperf3-r-after-17hr.png" />
 
