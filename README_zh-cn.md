@@ -4,6 +4,8 @@
 MT7915-Killer 是针对 MediaTek MT7915 (Wi-Fi 6) 芯片的深度调优驱动分支。
 本项目基于 2022 年 12 月的 [openwrt/mt76](https://github.com/openwrt/mt76) 源码，集成了截至 2026 年 3 月除 WED 外的大部分补丁，并针对 MT7621 等弱核 CPU 进行了专项定制，旨在提升性能并彻底解决长期高负载下的“老化”卡顿与重启问题。
 
+通过对比发现，MT7621 在运行 Wi-Fi 6 (MT7915) 时产生的 HRTIMER 计数远超 Wi-Fi 5 (MT7612)。本项目通过 x 次 NAPI 拦截，旨在规避 MT7621 GIC 中断控制器与 OCP 总线在极高频定时器负载下的物理饱和风险，将‘必死’的硬件重启转化为‘可控’的性能降级。
+
 ## 性能 (AP+Client)
 - 基准下载速率: 连续运行 ```iperf3 -R -w 1M -P1``` 17小时后
 <img width="472" height="277" alt="Perf-250M-after-17hr" src="iperf3-r-after-17hr.png" />
