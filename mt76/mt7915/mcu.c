@@ -627,7 +627,7 @@ mt7915_mcu_bss_hw_amsdu_tlv(struct sk_buff *skb)
 	amsdu->cmp_bitmap_0 = cpu_to_le32(TXD_CMP_MAP1);
 	amsdu->cmp_bitmap_1 = cpu_to_le32(TXD_CMP_MAP2);
 	amsdu->trig_thres = cpu_to_le16(2);
-	amsdu->enable = true;
+	amsdu->enable = false; // diable amsdu
 }
 
 static void
@@ -1043,9 +1043,10 @@ mt7915_mcu_sta_amsdu_tlv(struct mt7915_dev *dev, struct sk_buff *skb,
 
 	tlv = mt76_connac_mcu_add_tlv(skb, STA_REC_HW_AMSDU, sizeof(*amsdu));
 	amsdu = (struct sta_rec_amsdu *)tlv;
-	amsdu->max_amsdu_num = 8;
-	amsdu->amsdu_en = true;
-	msta->wcid.amsdu = true;
+	amsdu->max_amsdu_num = 0;
+	amsdu->amsdu_en = false;
+	msta->wcid.amsdu = false;
+	return; // diable amsdu
 
 	switch (sta->deflink.agg.max_amsdu_len) {
 	case IEEE80211_MAX_MPDU_LEN_VHT_11454:
