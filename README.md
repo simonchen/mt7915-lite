@@ -8,7 +8,11 @@ At the driver level, high-frequency, redundant polling operations for statistica
 
 ## Key Driver Optimizations (Linux 5.4.268)
   - **Stats_2 Lightweight Sampling**: The most important fix - Drastically reduced Wi-Fi statistics polling frequency, eliminating the "aging" effect where throughput drops after 12+ hours.
-  - MSDU density: changed from 4μs to 5us, forcing the hardware to aggregate more packets per interrupt, achieving a 99.92% MSDU aggregation rate.
+  - Disable AMSDU - Offloading logic back to hardware
+    Disabled software-level A-MSDU aggregation to reduce CPU overhead, combined with periodic asynchronous resetting of WTBL hardware counters.
+  - Mitigating firmware-side heuristic penalties
+    (ADM_COUNT_CLEAR) to eliminate firmware-side "rate-limiting bias," ensuring long-term throughput stability under 340Mbps sustained stress.
+  - MSDU density (Being hardware now): changed from 4μs to 5us, forcing the hardware to aggregate more packets per interrupt, achieving a 99.92% MSDU aggregation rate.
   - Heartbeat Scaling (HZ=1): Synchronized the driver heartbeat to 1 second, freeing CPU3 from high-frequency timer storms.
   - Memory Optimization: Downgraded DMA allocation to Order-0 (4KB) to prevent latency and allocation failures caused by memory fragmentation on    MIPS architectures.
   - WIFI5 Tuning: Optimized MSDU aggregation (Max 3 packets) for WIFI5 NICs (e.g., Killer-1535).
