@@ -24,7 +24,7 @@ At the driver level, high-frequency, redundant polling operations for statistica
 ## Recommended Architecture (CPU Affinity)
   - CPU0/1/3: Bind NAPI POLL workqueues and user-space apps.
   - CPU2: Bind Hard IRQs (mt7915e, mt7915e-hif) and mt76-tx workqueues (enforced by the driver).
-  - All Ifaces should set rx-0/rps_cpus = 0. (NAPI-POLL mode)
+  - All Ifaces should set rx-0/rps_cpus = b. (CPU0/1/3 same as NAPI-POLL binds)
 
 ## Stress Test Summary
   - Tested on MT7621 @1000MHz(Overclocking) with Killer-1535 NIC (PC runs on ```iperf3 -R -w 1M -P 1```)
