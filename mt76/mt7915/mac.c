@@ -1979,6 +1979,30 @@ void mt7915_mac_update_stats(struct mt7915_phy *phy)
 	}
 }
 
+static void mt7915_mac_sta_poll_clear(struct mt7915_dev *dev)
+{
+    struct mt7915_sta *msta;
+    LIST_HEAD(local_list); // 真正的本地临时副本
+
+    // 1. 瞬间切断：把全局任务搬到本地，此时占锁时间极短
+    spin_lock_bh(&dev->sta_poll_lock);
+    list_splice_init(&dev->sta_poll_list, &local_list);
+    spin_unlock_bh(&dev->sta_poll_lock);
+
+    while (!list_empty(&local_list)) {
+        // 2. 这里的锁是为了保护 list_del_init 的原子性
+        // 防止在处理过程中，该 msta 被其他 CPU 核心同时操作
+        spin_lock_bh(&dev->sta_poll_lock);
+        msta = list_first_entry(&local_list, struct mt7915_sta, poll_list);
+        list_del_init(&msta->poll_list);
+        spin_unlock_bh(&dev->sta_poll_lock);
+
+        // 3. 核心洗脑：此时已放锁，可以安全执行 5ms 忙等而不阻塞全局链表
+        mt7915_mac_wtbl_update(dev, msta->wcid.idx, MT_WTBL_UPDATE_ADM_COUNT_CLEAR);
+        memset(msta->airtime_ac, 0, sizeof(msta->airtime_ac));
+    }
+}
+
 void mt7915_mac_update_stats_2(struct mt7915_phy *phy)
 {
         struct mt7915_dev *dev = phy->dev;
@@ -2063,6 +2087,7 @@ void mt7915_mac_work(struct work_struct *work)
 {
 	struct mt7915_phy *phy;
 	struct mt76_phy *mphy;
+	bool clear = false; 
 
 	mphy = (struct mt76_phy *)container_of(work, struct mt76_phy,
 					       mac_work.work);
@@ -2072,6 +2097,7 @@ void mt7915_mac_work(struct work_struct *work)
 
 	mt76_update_survey(mphy);
 	if (++mphy->mac_work_count == 5) {
+		clear = true;
 		mphy->mac_work_count = 0;
 
 		if (phy->dev->full_survey == 1) {
@@ -2085,6 +2111,10 @@ void mt7915_mac_work(struct work_struct *work)
 	mutex_unlock(&mphy->dev->mutex);
 
 	mt76_tx_status_check(mphy->dev, false);
+
+	if (clear) {
+		mt7915_mac_sta_poll_clear(phy->dev); // Reset ADM Counts
+	}
 
 	ieee80211_queue_delayed_work(mphy->hw, &mphy->mac_work,
 				     MT7915_WATCHDOG_TIME);
