@@ -1979,6 +1979,29 @@ void mt7915_mac_update_stats(struct mt7915_phy *phy)
 	}
 }
 
+static void mt7915_mac_refresh_wash(struct mt7915_dev *dev, u8 band)
+{
+    u32 mask, set;
+
+    /* 1. 清除所有的 Backoff 退避时间 (最关键的“记忆”抹除) */
+    // 清除 TX 端的退避
+    mt76_clear(dev, MT_WTBLOFF_TOP_ACR(band), MT_WTBLOFF_TOP_ADM_BACKOFFTIME);
+    // 清除 RX 端的各优先级退避
+    mt76_clear(dev, MT_WF_RMAC_MIB_AIRTIME1(band), MT_WF_RMAC_MIB_NONQOSD_BACKOFF);
+    mt76_clear(dev, MT_WF_RMAC_MIB_AIRTIME3(band), MT_WF_RMAC_MIB_QOS01_BACKOFF);
+    mt76_clear(dev, MT_WF_RMAC_MIB_AIRTIME4(band), MT_WF_RMAC_MIB_QOS23_BACKOFF);
+
+    /* 2. 重置空口竞争估算值 (EIFS/OBSS) */
+    // 强制清除 EIFS 计时，让硬件重新抢占空口
+    mt76_wr(dev, MT_WF_RMAC_RSVD0(band), MT_WF_RMAC_RSVD0_EIFS_CLR);
+
+    // 重置 OBSS 退避时间偏移
+    /* clear backoff time and set software compensation for OBSS time */ 
+    mask = MT_WF_RMAC_MIB_OBSS_BACKOFF | MT_WF_RMAC_MIB_ED_OFFSET; 
+    set = FIELD_PREP(MT_WF_RMAC_MIB_OBSS_BACKOFF, 0) | FIELD_PREP(MT_WF_RMAC_MIB_ED_OFFSET, 4); 
+    mt76_rmw(dev, MT_WF_RMAC_MIB_AIRTIME0(band), mask, set);
+}
+
 static void mt7915_mac_sta_poll_clear(struct mt7915_dev *dev)
 {
     struct mt7915_sta *msta;
@@ -2113,7 +2136,10 @@ void mt7915_mac_work(struct work_struct *work)
 	mt76_tx_status_check(mphy->dev, false);
 
 	if (clear) {
-		mt7915_mac_sta_poll_clear(phy->dev); // Reset ADM Counts
+		u32 i;
+		mt7915_mac_sta_poll_clear(phy->dev); // Reset sta ADM Counts
+		for (i = 0; i < 2; i++) // Reset global Band (backoff/eifs/obss)
+			mt7915_mac_refresh_wash(phy->dev, i);
 	}
 
 	ieee80211_queue_delayed_work(mphy->hw, &mphy->mac_work,
