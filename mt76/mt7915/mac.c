@@ -239,9 +239,9 @@ void mt7915_mac_enable_rtscts(struct mt7915_dev *dev,
 	u32 addr;
 
 	addr = mt7915_mac_wtbl_lmac_addr(dev, mvif->sta.wcid.idx, 5);
-	if (enable)
-		mt76_set(dev, addr, BIT(5));
-	else
+	//if (enable)
+	//	mt76_set(dev, addr, BIT(5));
+	//else
 		mt76_clear(dev, addr, BIT(5));
 }
 
@@ -1214,6 +1214,10 @@ void mt7915_mac_set_timing(struct mt7915_phy *phy)
 	u8 band = phy->mt76->band_idx;
 	int eifs_ofdm = 360, sifs = 10, offset;
 	bool a_band = !(phy->mt76->chandef.chan->band == NL80211_BAND_2GHZ);
+	if (a_band) {
+		eifs_ofdm = 160; // fixed
+		phy->slottime = 9; // ignore the caller's
+	}
 
 	if (!test_bit(MT76_STATE_RUNNING, &phy->mt76->state))
 		return;
@@ -2110,11 +2114,13 @@ void mt7915_mac_work(struct work_struct *work)
 {
 	struct mt7915_phy *phy;
 	struct mt76_phy *mphy;
+	struct mt7915_dev *dev;
 	bool clear = false; 
 
 	mphy = (struct mt76_phy *)container_of(work, struct mt76_phy,
 					       mac_work.work);
 	phy = mphy->priv;
+	dev = phy->dev;
 
 	mutex_lock(&mphy->dev->mutex);
 
@@ -2137,9 +2143,21 @@ void mt7915_mac_work(struct work_struct *work)
 
 	if (clear) {
 		u32 i;
-		mt7915_mac_sta_poll_clear(phy->dev); // Reset sta ADM Counts
+		mt7915_mac_sta_poll_clear(dev); // Reset sta ADM Counts
 		for (i = 0; i < 2; i++) // Reset global Band (backoff/eifs/obss)
-			mt7915_mac_refresh_wash(phy->dev, i);
+			mt7915_mac_refresh_wash(dev, i);
+		mt7915_mac_cca_stats_reset(phy); // CCA reset
+		// Counters reset (AGG M1/M2.. reset)
+		for (i = 0; i < 4; i++) {
+                	mt76_rr(dev, MT_TX_AGG_CNT(phy->mt76->band_idx, i));
+                	mt76_rr(dev, MT_TX_AGG_CNT2(phy->mt76->band_idx, i));
+        	}
+        	memset(phy->mt76->aggr_stats, 0, sizeof(phy->mt76->aggr_stats));
+
+	        /* reset airtime counters */
+        	mt76_set(dev, MT_WF_RMAC_MIB_AIRTIME0(phy->mt76->band_idx),
+                	MT_WF_RMAC_MIB_RXTIME_CLR);
+
 	}
 
 	ieee80211_queue_delayed_work(mphy->hw, &mphy->mac_work,
