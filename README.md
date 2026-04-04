@@ -26,7 +26,7 @@ At the driver level, high-frequency, redundant polling operations for statistica
   - All Ifaces should set rx-0/rps_cpus = b. (CPU0/1/3 same as NAPI-POLL binds)
 
 ## Kennel DMA-CMA binding
-By backporting and forcing CONFIG_DMA_CMA in the Linux kernel (v5.4), we have ensured contiguous physical memory for DMA. This optimization brings the performance of the open-source driver up to the level of the original proprietary (closed-source) SDK. Below is the performance benchmark comparison:
+By backporting and forcing ```CONFIG_DMA_CMA``` in the Linux kernel (v5.4), we have ensured contiguous physical memory for DMA. This optimization brings the performance of the open-source driver up to the level of the original proprietary (closed-source) SDK. Below is the performance benchmark comparison:
 ### 🚀 Performance Optimization Benchmark (MT7621 + MT7915)
 
 | Metric | Before CMA (Kernel 5.4) | After CMA (Kernel 5.4) | Physical Significance |
