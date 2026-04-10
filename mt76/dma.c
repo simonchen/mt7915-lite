@@ -361,6 +361,7 @@ mt76_dma_tx_cleanup(struct mt76_dev *dev, struct mt76_queue *q, bool flush)
 
 	while (q->queued > 0 && q->tail != last) {
 		mt76_dma_tx_cleanup_idx(dev, q, q->tail, &entry);
+		wmb(); // sync. cpu write
 		mt76_queue_tx_complete(dev, q, &entry);
 
 		if (entry.txwi) {
@@ -890,8 +891,10 @@ int mt76_dma_rx_poll(struct napi_struct *napi, int budget)
 
 	rcu_read_unlock();
 
-	if (done < budget && napi_complete(napi))
+	if (done < budget && napi_complete(napi)) {
+		if (done) wmb(); // sync. cpu write
 		dev->drv->rx_poll_complete(dev, qid);
+	}
 
 	return done;
 }
