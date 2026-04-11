@@ -162,6 +162,19 @@ static void mt7915_mac_sta_poll(struct mt7915_dev *dev)
 		if (!msta->wcid.sta)
 			continue;
 
+                /* get signal strength of resp frames (CTS/BA/ACK) */
+                addr = mt7915_mac_wtbl_lmac_addr(dev, idx, 30);
+                val = mt76_rr(dev, addr);
+
+                rssi[0] = to_rssi(GENMASK(7, 0), val);
+                rssi[1] = to_rssi(GENMASK(15, 8), val);
+                rssi[2] = to_rssi(GENMASK(23, 16), val);
+                rssi[3] = to_rssi(GENMASK(31, 14), val);
+
+                msta->ack_signal =
+                        mt76_rx_signal(msta->vif->phy->mt76->antenna_mask, rssi);
+
+		/* continue to register airtime */
 		sta = container_of((void *)msta, struct ieee80211_sta,
 				   drv_priv);
 		for (i = 0; i < IEEE80211_NUM_ACS; i++) {
@@ -173,8 +186,11 @@ static void mt7915_mac_sta_poll(struct mt7915_dev *dev)
 			if (!tx_cur && !rx_cur)
 				continue;
 
-			ieee80211_sta_register_airtime(sta, tid, tx_cur,
-						       rx_cur);
+			if (!msta->ack_signal || msta->ack_signal > 65) {
+				ieee80211_sta_register_airtime(sta, tid, tx_cur, rx_cur);
+			} else {
+				ieee80211_sta_register_airtime(sta, tid, tx_cur, 0);
+			}
 		}
 
 		/*
@@ -214,7 +230,9 @@ static void mt7915_mac_sta_poll(struct mt7915_dev *dev)
 				rate->flags &= ~RATE_INFO_FLAGS_SHORT_GI;
 		}
 
+		ewma_avg_signal_add(&msta->avg_ack_signal, -msta->ack_signal);
 		/* get signal strength of resp frames (CTS/BA/ACK) */
+		/*
 		addr = mt7915_mac_wtbl_lmac_addr(dev, idx, 30);
 		val = mt76_rr(dev, addr);
 
@@ -227,6 +245,7 @@ static void mt7915_mac_sta_poll(struct mt7915_dev *dev)
 			mt76_rx_signal(msta->vif->phy->mt76->antenna_mask, rssi);
 
 		ewma_avg_signal_add(&msta->avg_ack_signal, -msta->ack_signal);
+		*/
 	}
 
 	rcu_read_unlock();
@@ -2141,9 +2160,9 @@ void mt7915_mac_work(struct work_struct *work)
 
 	mt76_tx_status_check(mphy->dev, false);
 
+	mt7915_mac_sta_poll(dev);
 	if (clear) {
 		u32 i;
-		mt7915_mac_sta_poll(dev);
 		mt7915_mac_sta_poll_clear(dev); // Reset sta ADM Counts
 		for (i = 0; i < 2; i++) // Reset global Band (backoff/eifs/obss)
 			mt7915_mac_refresh_wash(dev, i);

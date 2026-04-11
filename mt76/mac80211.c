@@ -1213,7 +1213,8 @@ mt76_check_sta(struct mt76_dev *dev, struct sk_buff *skb)
 			wcid = status->wcid = (struct mt76_wcid *)sta->drv_priv;
 	}
 
-	mt76_airtime_check(dev, skb);
+	if (dev->drv->drv_flags & MT_DRV_SW_RX_AIRTIME) // optimize..
+		mt76_airtime_check(dev, skb);
 
 	if (!wcid || !wcid->sta)
 		return;
