@@ -90,6 +90,39 @@ static int mt76_rx_queues_read(struct seq_file *s, void *data)
 	return 0;
 }
 
+static int mt76_rx_nframes_read(struct seq_file *s, void *data)
+{
+        struct mt76_dev *dev = dev_get_drvdata(s->private);
+
+	seq_printf(s, "nframes: %d\n", dev->aggr_nframes);
+
+	return 0;
+}
+
+static int
+mt76_rx_nframes_limit_set(void *data, u64 val)
+{
+        struct mt76_dev *dev = data;
+
+        dev->max_aggr_nframes = (u32)val;
+
+        return 0;
+}
+
+static int
+mt76_rx_nframes_limit_get(void *data, u64 *val)
+{
+        struct mt76_dev *dev = data;
+
+        *val = (u64)dev->max_aggr_nframes;
+
+        return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(fops_rx_nframes_limit, mt76_rx_nframes_limit_get, mt76_rx_nframes_limit_set,
+                         "%lld\n");
+
+
 void mt76_seq_puts_array(struct seq_file *file, const char *str,
 			 s8 *val, int len)
 {
@@ -123,6 +156,8 @@ mt76_register_debugfs_fops(struct mt76_phy *phy,
 		debugfs_create_blob("otp", 0400, dir, &dev->otp);
 	debugfs_create_devm_seqfile(dev->dev, "rx-queues", dir,
 				    mt76_rx_queues_read);
+	debugfs_create_devm_seqfile(dev->dev, "rx-aggr-nframes", dir, mt76_rx_nframes_read);
+	debugfs_create_file_unsafe("rx-aggr-nframes-limit", 0600, dir, dev, &fops_rx_nframes_limit);
 
 	return dir;
 }

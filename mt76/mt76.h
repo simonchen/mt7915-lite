@@ -820,6 +820,9 @@ struct mt76_dev {
 
 	u32 debugfs_reg;
 
+	u32 aggr_nframes;
+	u32 max_aggr_nframes;
+
 	u8 csa_complete;
 
 	u32 rxfilter;

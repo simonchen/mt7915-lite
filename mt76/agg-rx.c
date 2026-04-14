@@ -9,7 +9,7 @@ static unsigned long mt76_aggr_tid_to_timeo(u8 tidno)
 	/* Currently voice traffic (AC_VO) always runs without aggregation,
 	 * no special handling is needed. AC_BE/AC_BK use tids 0-3. Just check
 	 * for non AC_BK/AC_BE and set smaller timeout for it. */
-	return HZ / (tidno >= 4 ? 25 : 10);
+	return HZ / (tidno >= 4 ? 25 : 5);
 }
 
 static void
@@ -82,6 +82,7 @@ mt76_rx_aggr_check_release(struct mt76_rx_tid *tid, struct sk_buff_head *frames)
 			continue;
 
 		mt76_rx_aggr_release_frames(tid, frames, status->seqno);
+		break; // perhaps try to release at next reorder_work ??
 	}
 
 	mt76_rx_aggr_release_head(tid, frames);
@@ -94,7 +95,8 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 					       reorder_work.work);
 	struct mt76_dev *dev = tid->dev;
 	struct sk_buff_head frames;
-	int nframes;
+	bool has_frames;
+	//int nframes;
 
 	__skb_queue_head_init(&frames);
 
@@ -103,13 +105,35 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 
 	spin_lock(&tid->lock);
 	mt76_rx_aggr_check_release(tid, &frames);
-	nframes = tid->nframes;
+	has_frames = !skb_queue_empty(&frames);
+	//nframes = tid->nframes;
 	spin_unlock(&tid->lock);
+/* see the mt76_rx_aggr_reorder
+	if (nframes) {
+		struct mt76_rx_status *status;
+		struct sk_buff *skb;
+		int start, idx, tmp_nframes;
+		bool is_timeout = false;
+		tmp_nframes = nframes;
+		dev->aggr_nframes = nframes;
+		for (idx = (tid->head + 1) % tid->size; idx != start && tmp_nframes; idx = (idx + 1) % tid->size) {
+			skb = tid->reorder_buf[idx];
+			if (!skb) continue;
+			
+			tmp_nframes--;
+			status = (struct mt76_rx_status *)skb->cb;
+			is_timeout = time_after32(jiffies, status->reorder_time + HZ);
+			break; // just quick look at first skb
+		}
 
-	if (nframes)
-		ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
-					     mt76_aggr_tid_to_timeo(tid->num));
-	mt76_rx_complete(dev, &frames, NULL);
+		if (tid->num >= 4 || nframes >= dev->max_aggr_nframes || is_timeout) {
+			ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
+						     mt76_aggr_tid_to_timeo(tid->num));
+		}
+	}
+*/
+	if (has_frames)
+		mt76_rx_complete(dev, &frames, NULL);
 
 	rcu_read_unlock();
 	local_bh_enable();
@@ -151,6 +175,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	struct mt76_wcid *wcid = status->wcid;
 	struct ieee80211_sta *sta;
 	struct mt76_rx_tid *tid;
+	struct mt76_dev *dev;
 	bool sn_less;
 	u16 seqno, head, size, idx;
 	u8 tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
@@ -232,8 +257,13 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	tid->nframes++;
 	mt76_rx_aggr_release_head(tid, frames);
 
-	ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
-				     mt76_aggr_tid_to_timeo(tid->num));
+	//ieee80211_queue_delayed_work(tid->dev->hw, &tid->reorder_work,
+	//			     mt76_aggr_tid_to_timeo(tid->num));
+	dev = tid->dev;
+	dev->aggr_nframes = tid->nframes;
+	if (tid->nframes >= dev->max_aggr_nframes) {
+		queue_work(system_unbound_wq, &tid->reorder_work.work);
+	}
 
 out:
 	spin_unlock_bh(&tid->lock);
@@ -250,11 +280,14 @@ int mt76_rx_aggr_start(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tidno,
 	if (!tid)
 		return -ENOMEM;
 
+	dev->max_aggr_nframes = 8; // indicates that how many backlog frames will be processed at once-off.
+
 	tid->dev = dev;
 	tid->head = ssn;
 	tid->size = size;
 	tid->num = tidno;
-	INIT_DELAYED_WORK(&tid->reorder_work, mt76_rx_aggr_reorder_work);
+	//INIT_DELAYED_WORK(&tid->reorder_work, mt76_rx_aggr_reorder_work);
+	INIT_WORK(&tid->reorder_work.work, mt76_rx_aggr_reorder_work);
 	spin_lock_init(&tid->lock);
 
 	rcu_assign_pointer(wcid->aggr[tidno], tid);
@@ -284,7 +317,8 @@ static void mt76_rx_aggr_shutdown(struct mt76_dev *dev, struct mt76_rx_tid *tid)
 
 	spin_unlock_bh(&tid->lock);
 
-	cancel_delayed_work_sync(&tid->reorder_work);
+	//cancel_delayed_work_sync(&tid->reorder_work);
+	cancel_work_sync(&tid->reorder_work.work);
 }
 
 void mt76_rx_aggr_stop(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tidno)
