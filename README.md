@@ -1,6 +1,6 @@
 [English](README.md)   [中文](README_zh-cn.md)
 
-# mt7915-lite
+# mt7915-lite (Compatible with Kernel 5.4)
 Unlike generic drivers, **mt7915-lite** is an ultra-stability, high-performance driver branch for MediaTek MT7915 (Wi-Fi 6) Based on [openwrt/mt76](https://github.com/openwrt/mt76) (Dec 2022) with patches up to March 2026 (excl. WED). This project moves beyond simple patching to implement deep driver-level logic optimization and kernel-level task offloading.
 
 At the driver level, high-frequency, redundant polling operations for statistical data were causing hardware sampling distortions on the MT7915; furthermore, the WTBL (Wireless Table) mechanism would subsequently amplify this issue, leading to reduced speeds for specific MAC addresses. Conversely, the true performance bottleneck in a Wi-Fi 6 environment—particularly on platforms utilizing traditional CPUs like the MT7621—is not the raw data throughput itself, but rather the "interrupt and sampling overhead." Through streamlined optimizations applied to both the driver level and the kernel architecture, we have successfully achieved industrial-grade system stability.
