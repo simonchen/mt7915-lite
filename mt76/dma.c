@@ -877,10 +877,12 @@ int mt76_dma_rx_poll(struct napi_struct *napi, int budget)
 {
 	struct mt76_dev *dev;
 	int qid, done = 0, cur;
+	int retry_limit = 2; // greedy recieve skb from DMA
 
 	dev = container_of(napi->dev, struct mt76_dev, napi_dev);
 	qid = napi - dev->napi;
 
+rev_dma:
 	rcu_read_lock();
 
 	do {
@@ -894,6 +896,13 @@ int mt76_dma_rx_poll(struct napi_struct *napi, int budget)
 	if (done < budget && napi_complete(napi)) {
 		if (done) wmb(); // sync. cpu write
 		dev->drv->rx_poll_complete(dev, qid);
+		return done;
+	}else if (--retry_limit > 0) {
+		done = 0;
+		if (dev->napi_dev.threaded == 1){
+			cond_resched();
+		}
+		goto rev_dma;
 	}
 
 	return done;
