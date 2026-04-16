@@ -898,10 +898,11 @@ rev_dma:
 		dev->drv->rx_poll_complete(dev, qid);
 		return done;
 	}else if (--retry_limit > 0) {
-		done = 0;
-		if (dev->napi_dev.threaded == 1){
+		if (unlikely(tif_need_resched())) {
 			cond_resched();
+			return done;
 		}
+		done = 0;
 		goto rev_dma;
 	}
 
