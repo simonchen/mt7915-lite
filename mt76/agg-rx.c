@@ -261,7 +261,7 @@ void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames)
 	//			     mt76_aggr_tid_to_timeo(tid->num));
 	dev = tid->dev;
 	dev->aggr_nframes = tid->nframes;
-	if (tid->nframes >= dev->max_aggr_nframes) {
+	if (tid->num >= 4 || tid->nframes >= dev->max_aggr_nframes) {
 		queue_work(system_unbound_wq, &tid->reorder_work.work);
 	}
 

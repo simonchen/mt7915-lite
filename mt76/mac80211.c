@@ -1314,12 +1314,20 @@ void mt76_rx_poll_complete(struct mt76_dev *dev, enum mt76_rxq_id q,
 
 	while ((skb = __skb_dequeue(&dev->rx_skb[q])) != NULL) {
 		struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
+		struct ieee80211_sta *sta = NULL;
+		bool hash_needed = true;
 		if (status->wcid && status->wcid->sta){
 			u8 tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
 			last_tid = rcu_dereference(status->wcid->aggr[tidno]);
+			sta = container_of((void *)status->wcid, struct ieee80211_sta, drv_priv); 
 		}
-		skb_record_rx_queue(skb, q); // recording the qid for RPS affinity
-		skb_set_hash(skb, (fake_hash_roller++ >> 2), PKT_HASH_TYPE_L3); // fake hash
+		if (sta && sta->deflink.he_cap.has_he) { 
+			hash_needed = false;
+		}
+		if (hash_needed) {// for wifi5 only
+			skb_record_rx_queue(skb, q); // recording the qid for RPS affinity
+			skb_set_hash(skb, (fake_hash_roller++ >> 2), PKT_HASH_TYPE_L3); // fake hash
+		}
 		mt76_check_sta(dev, skb);
 		if (mtk_wed_device_active(&dev->mmio.wed))
 			__skb_queue_tail(&frames, skb);

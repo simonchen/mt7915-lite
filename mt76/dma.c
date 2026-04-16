@@ -877,7 +877,7 @@ int mt76_dma_rx_poll(struct napi_struct *napi, int budget)
 {
 	struct mt76_dev *dev;
 	int qid, done = 0, cur;
-	int retry_limit = 2; // greedy recieve skb from DMA
+	int retry_limit = 3; // greedy recieve skb from DMA
 
 	dev = container_of(napi->dev, struct mt76_dev, napi_dev);
 	qid = napi - dev->napi;
