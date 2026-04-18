@@ -741,6 +741,9 @@ struct mt76_phy {
 	} leds;
 };
 
+extern atomic_t rx_poll_retry_cnt;
+extern int rx_poll_timeo;
+
 struct mt76_dev {
 	struct mt76_phy phy; /* must be first */
 	struct mt76_phy *phys[__MT_MAX_BAND];

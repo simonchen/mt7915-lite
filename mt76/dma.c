@@ -873,11 +873,61 @@ free_frag:
 	return done;
 }
 
+#define MAX_RX_POLL_RETRY 3
+#define DEFAULT_RX_POLL_TIMEO 1000 // us
+#define MAX_SAMPLE_COUNT 100
+atomic_t rx_poll_retry_cnt = ATOMIC_INIT(MAX_RX_POLL_RETRY);
+int rx_poll_timeo = DEFAULT_RX_POLL_TIMEO;
+
+static void mt76_rx_poll_retry_adjust(u64 start_jif)
+{
+	static struct {
+		u32 total_elapsed;
+		u16 sample_cnt;
+		u16 total_sample_cnt;
+		u8 max_retry_sum;
+	} ____cacheline_aligned rx_stats;
+	u64 elapsed = ktime_get() - start_jif;
+	int val = atomic_read(&rx_poll_retry_cnt);
+
+	if (rx_stats.sample_cnt++ < MAX_SAMPLE_COUNT) {
+		rx_stats.total_elapsed += elapsed;
+		return;
+	}
+	rx_stats.total_sample_cnt += rx_stats.sample_cnt;
+
+	if (rx_stats.total_elapsed >= rx_poll_timeo*1000*MAX_SAMPLE_COUNT) {
+		if (val > 1) {
+			atomic_dec(&rx_poll_retry_cnt);
+		}
+	} else {
+		if (val < MAX_RX_POLL_RETRY)
+			atomic_inc(&rx_poll_retry_cnt);
+	}
+
+	rx_stats.sample_cnt = 0; rx_stats.total_elapsed = 0; // reset
+
+	// check if the accumated count at MAX_RX_POLL_RETRY
+	val = atomic_read(&rx_poll_retry_cnt);
+	if (val == MAX_RX_POLL_RETRY)
+		rx_stats.max_retry_sum++; // recording the max_retry_sum
+	if (rx_stats.total_sample_cnt >= MAX_SAMPLE_COUNT*10) {
+		if (rx_stats.max_retry_sum >= 7) {
+			rx_poll_timeo -= 100; // us
+		} else {
+			rx_poll_timeo += 100; // us
+		}
+		if (rx_poll_timeo < 0) rx_poll_timeo = 0; // avoiding integer overflow when comparing to u32 or u64
+		rx_stats.total_sample_cnt = 0; rx_stats.max_retry_sum = 0; // reset
+	}
+}
+
 int mt76_dma_rx_poll(struct napi_struct *napi, int budget)
 {
-	struct mt76_dev *dev;
+	struct mt76_dev *dev = NULL;
 	int qid, done = 0, cur;
-	int retry_limit = 3; // greedy recieve skb from DMA
+	int retry_limit = atomic_read(&rx_poll_retry_cnt); 
+	u64 start_jif = ktime_get();
 
 	dev = container_of(napi->dev, struct mt76_dev, napi_dev);
 	qid = napi - dev->napi;
@@ -896,16 +946,19 @@ rev_dma:
 	if (done < budget && napi_complete(napi)) {
 		if (done) wmb(); // sync. cpu write
 		dev->drv->rx_poll_complete(dev, qid);
+		mt76_rx_poll_retry_adjust(start_jif);
 		return done;
 	}else if (--retry_limit > 0) {
 		if (unlikely(tif_need_resched())) {
 			cond_resched();
+			mt76_rx_poll_retry_adjust(start_jif);
 			return done;
 		}
 		done = 0;
 		goto rev_dma;
 	}
 
+	mt76_rx_poll_retry_adjust(start_jif);
 	return done;
 }
 EXPORT_SYMBOL_GPL(mt76_dma_rx_poll);

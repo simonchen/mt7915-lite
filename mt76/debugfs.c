@@ -122,6 +122,39 @@ mt76_rx_nframes_limit_get(void *data, u64 *val)
 DEFINE_DEBUGFS_ATTRIBUTE(fops_rx_nframes_limit, mt76_rx_nframes_limit_get, mt76_rx_nframes_limit_set,
                          "%lld\n");
 
+static int
+mt76_rx_poll_retry_cnt_read(struct seq_file *s, void *data)
+{
+	//struct mt76_dev *dev = dev_get_drvdata(s->private);
+
+        seq_printf(s, "rx_poll_retry_cnt: %d\n", atomic_read(&rx_poll_retry_cnt));
+
+        return 0;
+}
+
+static int
+mt76_rx_poll_timeo_set(void *data, u64 val)
+{
+        //struct mt76_dev *dev = data;
+
+        rx_poll_timeo = (int)val;
+
+        return 0;
+}
+
+static int
+mt76_rx_poll_timeo_get(void *data, u64 *val)
+{
+        //struct mt76_dev *dev = data;
+
+        *val = (u64)rx_poll_timeo;
+
+        return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(fops_rx_poll_timeo, mt76_rx_poll_timeo_get, mt76_rx_poll_timeo_set,
+                         "%lld\n");
+
 
 void mt76_seq_puts_array(struct seq_file *file, const char *str,
 			 s8 *val, int len)
@@ -158,6 +191,9 @@ mt76_register_debugfs_fops(struct mt76_phy *phy,
 				    mt76_rx_queues_read);
 	debugfs_create_devm_seqfile(dev->dev, "rx-aggr-nframes", dir, mt76_rx_nframes_read);
 	debugfs_create_file_unsafe("rx-aggr-nframes-limit", 0600, dir, dev, &fops_rx_nframes_limit);
+
+	debugfs_create_devm_seqfile(dev->dev, "rx-poll-retry-cnt", dir, mt76_rx_poll_retry_cnt_read);
+	debugfs_create_file_unsafe("rx-poll-timeo", 0600, dir, dev, &fops_rx_poll_timeo);
 
 	return dir;
 }
