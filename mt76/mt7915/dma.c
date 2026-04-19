@@ -561,9 +561,14 @@ int mt7915_dma_init(struct mt7915_dev *dev, struct mt7915_phy *phy2)
 	ret = mt76_init_queues(dev, mt76_dma_rx_poll);
 	if (ret < 0)
 		return ret;
-
-	netif_napi_add_tx(&dev->mt76.tx_napi_dev, &dev->mt76.tx_napi,
-			  mt7915_poll_tx);
+#if LINUX_VERSION_IS_LESS(4,5,0)
+	netif_napi_add(&dev->mt76.tx_napi_dev, &dev->mt76.tx_napi,
+		mt7915_poll_tx, MT7915_NAPI_POLL_WEIGHT);
+#else
+#define MT7915_NAPI_POLL_WEIGHT   128
+	netif_tx_napi_add(&dev->mt76.tx_napi_dev, &dev->mt76.tx_napi,
+		mt7915_poll_tx, MT7915_NAPI_POLL_WEIGHT);
+#endif
 	napi_enable(&dev->mt76.tx_napi);
 
 	mt7915_dma_enable(dev);
