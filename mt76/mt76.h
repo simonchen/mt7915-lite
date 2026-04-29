@@ -19,13 +19,13 @@
 #include "testmode.h"
 
 #define MT_MCU_RING_SIZE	32
-#define MT_RX_BUF_SIZE		2048
+#define MT_RX_BUF_SIZE		4096
 #define MT_SKB_HEAD_LEN		256
 
-#define MT_MAX_NON_AQL_PKT	32
-#define MT_TXQ_FREE_THR		64
+#define MT_MAX_NON_AQL_PKT	64
+#define MT_TXQ_FREE_THR		128
 
-#define MT76_TOKEN_FREE_THR	128
+#define MT76_TOKEN_FREE_THR	256
 
 #define MT_QFLAG_WED_RING	GENMASK(1, 0)
 #define MT_QFLAG_WED_TYPE	GENMASK(3, 2)

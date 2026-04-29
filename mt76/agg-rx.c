@@ -280,7 +280,7 @@ int mt76_rx_aggr_start(struct mt76_dev *dev, struct mt76_wcid *wcid, u8 tidno,
 	if (!tid)
 		return -ENOMEM;
 
-	dev->max_aggr_nframes = 8; // indicates that how many backlog frames will be processed at once-off.
+	dev->max_aggr_nframes = 1; // indicates that how many backlog frames will be processed at once-off.
 
 	tid->dev = dev;
 	tid->head = ssn;
