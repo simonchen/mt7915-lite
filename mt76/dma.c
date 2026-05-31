@@ -960,7 +960,7 @@ rev_dma:
 
 	rcu_read_unlock();
 
-	if (done < budget && napi_complete(napi)) {
+	if (done < budget && napi_complete_done(napi, done)) {
 		if (done) wmb(); // sync. cpu write
 		dev->drv->rx_poll_complete(dev, qid);
 		if (rx_poll_retry_enable) mt76_rx_poll_retry_adjust(start_jif);

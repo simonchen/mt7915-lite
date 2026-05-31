@@ -32,8 +32,8 @@ static int mt7915_poll_tx(struct napi_struct *napi, int budget)
 	mt76_connac_tx_cleanup(&dev->mt76);
 	
 	if (++dev->mcu_poll_cnt < dev->max_mcu_poll_cnt) {
-		napi_complete(napi);
-        	napi_schedule(napi);
+		if (napi_complete_done(napi, 0))
+        		napi_schedule(napi);
         	return 0;
 	}
 	dev->mcu_poll_cnt = 0;
@@ -565,7 +565,7 @@ int mt7915_dma_init(struct mt7915_dev *dev, struct mt7915_phy *phy2)
 	netif_napi_add(&dev->mt76.tx_napi_dev, &dev->mt76.tx_napi,
 		mt7915_poll_tx, MT7915_NAPI_POLL_WEIGHT);
 #else
-#define MT7915_NAPI_POLL_WEIGHT   128
+#define MT7915_NAPI_POLL_WEIGHT   64
 	netif_tx_napi_add(&dev->mt76.tx_napi_dev, &dev->mt76.tx_napi,
 		mt7915_poll_tx, MT7915_NAPI_POLL_WEIGHT);
 #endif
