@@ -1322,11 +1322,11 @@ void mt76_rx_poll_complete(struct mt76_dev *dev, enum mt76_rxq_id q,
 			sta = container_of((void *)status->wcid, struct ieee80211_sta, drv_priv); 
 		}
 		if (sta && sta->deflink.he_cap.has_he) { 
-			hash_needed = false;
+			//hash_needed = false;
 		}
 		if (hash_needed) {// for wifi5 only
 			skb_record_rx_queue(skb, q); // recording the qid for RPS affinity
-			skb_set_hash(skb, (fake_hash_roller++ >> 2), PKT_HASH_TYPE_L3); // fake hash
+			skb_set_hash(skb, (fake_hash_roller++ >> 8 & 1) << 31, PKT_HASH_TYPE_L3); // fake hash
 		}
 		mt76_check_sta(dev, skb);
 		if (mtk_wed_device_active(&dev->mmio.wed))
