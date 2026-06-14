@@ -1302,10 +1302,24 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 	}
 }
 
+// simonchen - RPS Target CPU
+#ifndef MTK_NAPI_ID
+#define MTK_NAPI_ID 0xFFFF7915
+#endif
+#define POLL_PKTS_64 64
+#define POLL_PKTS_256 256
+#define POLL_PKTS_512 512
+#define POLL_PKTS_1024 1024
+#define GET_TARGET_CPU_HASH(roller, pkts) ({		\
+    u32 __hash_val = 0;                                 \
+    __hash_val = ((__this_cpu_read(roller) >> (31 - __builtin_clz(pkts))) & 1) << 31; \
+    __this_cpu_add(roller, 1);				\
+    __hash_val;                                         \
+})
+DEFINE_PER_CPU(u32, fake_hash_roller) = 0;
 void mt76_rx_poll_complete(struct mt76_dev *dev, enum mt76_rxq_id q,
 			   struct napi_struct *napi)
 {
-	static u32 fake_hash_roller = 0;
 	struct sk_buff_head frames;
 	struct sk_buff *skb;
 	struct mt76_rx_tid *last_tid = NULL;
@@ -1313,21 +1327,19 @@ void mt76_rx_poll_complete(struct mt76_dev *dev, enum mt76_rxq_id q,
 	__skb_queue_head_init(&frames);
 
 	while ((skb = __skb_dequeue(&dev->rx_skb[q])) != NULL) {
+		/*
 		struct mt76_rx_status *status = (struct mt76_rx_status *)skb->cb;
 		struct ieee80211_sta *sta = NULL;
-		bool hash_needed = true;
 		if (status->wcid && status->wcid->sta){
 			u8 tidno = status->qos_ctl & IEEE80211_QOS_CTL_TID_MASK;
 			last_tid = rcu_dereference(status->wcid->aggr[tidno]);
 			sta = container_of((void *)status->wcid, struct ieee80211_sta, drv_priv); 
 		}
-		if (sta && sta->deflink.he_cap.has_he) { 
-			//hash_needed = false;
-		}
-		if (hash_needed) {// for wifi5 only
-			skb_record_rx_queue(skb, q); // recording the qid for RPS affinity
-			skb_set_hash(skb, (fake_hash_roller++ >> 8 & 1) << 31, PKT_HASH_TYPE_L3); // fake hash
-		}
+		*/
+		skb_record_rx_queue(skb, q); // recording the qid for RPS affinity
+		skb_set_hash(skb, GET_TARGET_CPU_HASH(fake_hash_roller, POLL_PKTS_64), PKT_HASH_TYPE_L4); // fake hash
+		skb->napi_id = MTK_NAPI_ID;
+		
 		mt76_check_sta(dev, skb);
 		if (mtk_wed_device_active(&dev->mmio.wed))
 			__skb_queue_tail(&frames, skb);
