@@ -1,15 +1,42 @@
-// SPDX-License-Identifier: ISC
+// SPDX-License-Identifier: ISCST
 /* Copyright (C) 2020 MediaTek Inc. */
 
 #include <linux/etherdevice.h>
 #include <linux/hwmon.h>
 #include <linux/hwmon-sysfs.h>
 #include <linux/thermal.h>
+#include <linux/firmware.h>
 #include "mt7915.h"
 #include "mac.h"
 #include "mcu.h"
 #include "coredump.h"
 #include "eeprom.h"
+
+bool profile_has_rate_control(struct device *dev)
+{
+	const struct firmware *fw = NULL;
+	int ret;
+	bool enable_rate_ctrl = true;
+
+	ret = request_firmware(&fw, "mediatek/mt7915.cfg", dev);
+	if (ret == 0 && fw && fw->data) {
+		char *config_str = kzalloc(fw->size + 1, GFP_KERNEL);
+		if (config_str) {
+			memcpy(config_str, fw->data, fw->size);
+			char *match = strnstr(config_str, "HasRateControl=", fw->size);
+			if (match) {
+				char val = *(match + strlen("HasRateControl="));
+				if (val == '0')
+					enable_rate_ctrl = false;
+				else if (val == '1')
+					enable_rate_ctrl = true;
+			}
+			kfree(config_str);
+		}
+		release_firmware(fw);
+	}
+	return enable_rate_ctrl;
+}
 
 static const struct ieee80211_iface_limit if_limits[] = {
 	{
@@ -389,7 +416,10 @@ mt7915_init_wiphy(struct mt7915_phy *phy)
 		wiphy_ext_feature_set(wiphy,
 				      NL80211_EXT_FEATURE_RADAR_BACKGROUND);
 
-	ieee80211_hw_set(hw, HAS_RATE_CONTROL);
+	/*if (profile_has_rate_control(mdev->dev)) {
+		ieee80211_hw_set(hw, HAS_RATE_CONTROL);
+		dev_err(mdev->dev, "====== MT7915.cfg ieee80211_hw_set(hw, HAS_RATE_CONTROL) @%s\n", __func__);
+	}*/
 	ieee80211_hw_set(hw, SUPPORTS_TX_ENCAP_OFFLOAD);
 	ieee80211_hw_set(hw, SUPPORTS_RX_DECAP_OFFLOAD);
 	ieee80211_hw_set(hw, SUPPORTS_MULTI_BSSID);

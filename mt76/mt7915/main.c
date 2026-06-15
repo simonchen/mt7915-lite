@@ -201,6 +201,8 @@ static void mt7915_init_bitrate_mask(struct ieee80211_vif *vif)
 	}
 }
 
+extern bool profile_has_rate_control(struct device *dev);
+
 static int mt7915_add_interface(struct ieee80211_hw *hw,
 				struct ieee80211_vif *vif)
 {
@@ -212,6 +214,14 @@ static int mt7915_add_interface(struct ieee80211_hw *hw,
 	int idx, ret = 0;
 
 	mutex_lock(&dev->mt76.mutex);
+
+	if (profile_has_rate_control(&hw->wiphy->dev)) {
+		__set_bit(IEEE80211_HW_HAS_RATE_CONTROL, hw->flags);
+		dev_err(&hw->wiphy->dev, "====== MT7915.cfg __set_bit(IEEE80211_HW_HAS_RATE_CONTROL, hw->flags); @%s\n", __func__);
+	} else {
+		__clear_bit(IEEE80211_HW_HAS_RATE_CONTROL, hw->flags);
+		dev_err(&hw->wiphy->dev, "====== MT7915.cfg __clear_bit(IEEE80211_HW_HAS_RATE_CONTROL, hw->flags); @%s\n", __func__);
+	}
 
 	mt76_testmode_reset(phy->mt76, true);
 
