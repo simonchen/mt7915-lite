@@ -162,11 +162,11 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 		dev_err(mdev->dev, "Message %08x (seq %d) timeout\n",
 			cmd, seq);
 		// reset the device after MCU timeout @362fec0
-		dev->recovery.restart = true;
+		/*dev->recovery.restart = true;
 		set_bit(MT76_MCU_RESET, &dev->mphy.state);
 		wake_up(&dev->mt76.mcu.wait);
 		queue_work(dev->mt76.wq, &dev->reset_work);
-		wake_up(&dev->reset_wait);
+		wake_up(&dev->reset_wait);*/
 		return -ETIMEDOUT;
 	}
 
