@@ -383,20 +383,30 @@ static void mt7915_mcu_rx_ps_sync(struct mt7915_dev *dev, struct sk_buff *skb)
 	struct ieee80211_sta *sta;
 	struct mt76_wcid *wcid;
 	u16 wcid_idx;
+	bool is_ps;
 
 	p = (struct mt7915_mcu_ps_notify *)skb->data;
 	wcid_idx = p->wtbl_lower | (p->wtbl_higher) << 8;
+	is_ps = !!p->ps_bit;
 
 	rcu_read_lock();
 	wcid = mt76_wcid_ptr(dev, wcid_idx);
 	if (!wcid)
 		goto out;
 
+	if (is_ps)
+		set_bit(MT_WCID_FLAG_PS, &wcid->flags);
+	else
+		clear_bit(MT_WCID_FLAG_PS, &wcid->flags);
+
 	sta = wcid_to_sta(wcid);
 	if (!sta)
 		goto out;
 
-	ieee80211_sta_ps_transition_ni(sta, !!p->ps_bit);
+	/* Don't report PS MODE to kernel stack
+	 * Instead, only process beacon queues on tx.c
+	 */
+	//ieee80211_sta_ps_transition_ni(sta, is_ps);
 
 out:
 	rcu_read_unlock();

@@ -446,8 +446,12 @@ mt76_txq_send_burst(struct mt76_phy *phy, struct mt76_queue *q,
 	bool stop = false;
 	int idx;
 
-	if (test_bit(MT_WCID_FLAG_PS, &wcid->flags))
-		return 0;
+	if (test_bit(MT_WCID_FLAG_PS, &wcid->flags)) {
+	       if (qid == MT_TXQ_VO || qid == MT_TXQ_VI ||
+			qid == MT_TXQ_BE || qid == MT_TXQ_BK) {
+			return 0;
+		}
+	}
 
 	if (atomic_read(&wcid->non_aql_packets) >= MT_MAX_NON_AQL_PKT)
 		return 0;
@@ -526,8 +530,14 @@ mt76_txq_schedule_list(struct mt76_phy *phy, enum mt76_txq_id qid)
 
 		mtxq = (struct mt76_txq *)txq->drv_priv;
 		wcid = rcu_dereference(dev->wcid[mtxq->wcid]);
-		if (!wcid || test_bit(MT_WCID_FLAG_PS, &wcid->flags))
+		if (!wcid)
 			continue;
+		if (test_bit(MT_WCID_FLAG_PS, &wcid->flags)) {
+			if (qid == MT_TXQ_VO || qid == MT_TXQ_VI || 
+				qid == MT_TXQ_BE || qid == MT_TXQ_BK) {
+				continue;
+			}
+		}
 
 		if (mtxq->send_bar && mtxq->aggr) {
 			struct ieee80211_txq *txq = mtxq_to_txq(mtxq);
