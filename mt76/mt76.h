@@ -223,6 +223,7 @@ struct mt76_mcu_ops {
 	int (*mcu_rd_rp)(struct mt76_dev *dev, u32 base,
 			 struct mt76_reg_pair *rp, int len);
 	int (*mcu_restart)(struct mt76_dev *dev);
+	void (*mcu_set_timeout)(struct mt76_dev *mdev, int cmd);
 };
 
 struct mt76_queue_ops {
@@ -1288,7 +1289,7 @@ void mt76_put_txwi(struct mt76_dev *dev, struct mt76_txwi_cache *t);
 void mt76_put_rxwi(struct mt76_dev *dev, struct mt76_txwi_cache *t);
 struct mt76_txwi_cache *mt76_get_rxwi(struct mt76_dev *dev);
 void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
-		      struct napi_struct *napi);
+		      struct napi_struct *napi, enum mt76_rxq_id qid);
 void mt76_rx_poll_complete(struct mt76_dev *dev, enum mt76_rxq_id q,
 			   struct napi_struct *napi);
 void mt76_rx_aggr_reorder(struct sk_buff *skb, struct sk_buff_head *frames);

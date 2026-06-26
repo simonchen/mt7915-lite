@@ -3,7 +3,70 @@
  * Copyright (C) 2019 Lorenzo Bianconi <lorenzo.bianconi83@gmail.com>
  */
 
+#include <linux/wait.h>
+#include <linux/rcupdate.h>
 #include "mt76.h"
+#include "mt76_connac_mcu.h"
+
+/*
+#define mt76_busy_wait_event_timeout(wq_head, condition, timeout)	\
+do {									\
+	unsigned long __last_qs = jiffies;				\
+	unsigned long __end = __last_qs + (timeout);			\
+	for (;;) {							\
+		rmb();							\
+		if (condition)						\
+			break;						\
+		if (time_after_eq(jiffies, __end))			\
+			break;						\
+		cond_resched();						\
+		msleep(1); cpu_relax();				\
+		rcu_softirq_qs_periodic(__last_qs);			\
+	}								\
+} while (0)
+*/
+
+#define ___mt76_wait_event(wq_head, condition, state, exclusive, ret, cmd)      \
+({                                                                              \
+        __label__ __out;                                                        \
+        struct wait_queue_entry __wq_entry;                                     \
+        long __ret = ret;       /* explicit shadow */                           \
+	unsigned long __end = jiffies + (ret);					\
+	unsigned int wq_flags = (cmd == MCU_EXT_CMD(GET_MIB_INFO)) ? WQ_FLAG_EXCLUSIVE : 0; \
+										\
+        init_wait_entry(&__wq_entry, wq_flags);					\
+        for (;;) {                                                              \
+                long __int = prepare_to_wait_event(&wq_head, &__wq_entry, state);\
+                                                                                \
+                if (condition)                                                  \
+                        break;                                                  \
+		if (time_after_eq(jiffies, __end))				\
+			break;							\
+                                                                                \
+                if (___wait_is_interruptible(state) && __int) {                 \
+                        __ret = __int;                                          \
+                        goto __out;                                             \
+                }                                                               \
+                                                                                \
+                cmd;                                                            \
+        }                                                                       \
+        finish_wait(&wq_head, &__wq_entry);                                     \
+__out:  __ret;                                                                  \
+})
+
+#define __mt76_wait_event_timeout(wq_head, condition, timeout)			\
+	___mt76_wait_event(wq_head, ___wait_cond_timeout(condition),		\
+		      TASK_UNINTERRUPTIBLE, 0, timeout,				\
+		      cond_resched())
+
+#define mt76_wait_event_timeout(wq_head, condition, timeout)                    \
+({                                                                              \
+        long __ret = timeout;                                                   \
+        might_sleep();                                                          \
+        if (!___wait_cond_timeout(condition))                                   \
+                __ret = __mt76_wait_event_timeout(wq_head, condition, timeout); \
+        __ret;                                                                  \
+})
 
 struct sk_buff *
 __mt76_mcu_msg_alloc(struct mt76_dev *dev, const void *data,
@@ -38,7 +101,7 @@ struct sk_buff *mt76_mcu_get_response(struct mt76_dev *dev,
 		return NULL;
 
 	timeout = expires - jiffies;
-	wait_event_timeout(dev->mcu.wait,
+	mt76_wait_event_timeout(dev->mcu.wait,
 			   (!skb_queue_empty(&dev->mcu.res_q) ||
 			    test_bit(MT76_MCU_RESET, &dev->phy.state)),
 			   timeout);
@@ -92,6 +155,9 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
 		goto out;
 	}
 
+	if (dev->mcu_ops->mcu_set_timeout)
+		dev->mcu_ops->mcu_set_timeout(dev, cmd);
+
 	expires = jiffies + dev->mcu.timeout;
 
 	do {
@@ -101,7 +167,7 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
 			*ret_skb = skb;
 		else
 			dev_kfree_skb(skb);
-	} while (ret == -EAGAIN);
+	} while (ret == -EAGAIN && (cmd != MCU_EXT_CMD(GET_MIB_INFO)));
 
 out:
 	mutex_unlock(&dev->mcu.mutex);

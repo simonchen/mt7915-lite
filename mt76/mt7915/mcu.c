@@ -2466,6 +2466,7 @@ int mt7915_mcu_init(struct mt7915_dev *dev)
 		.mcu_skb_send_msg = mt7915_mcu_send_message,
 		.mcu_parse_response = mt7915_mcu_parse_response,
 		.mcu_restart = mt76_connac_mcu_restart,
+		.mcu_set_timeout = mt7915_mcu_set_timeout,
 	};
 
 	dev->mt76.mcu_ops = &mt7915_mcu_ops;
