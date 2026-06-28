@@ -525,6 +525,7 @@ struct mt76_mcu {
 	struct mutex mutex;
 	u32 msg_seq;
 	int timeout;
+        unsigned long mib_access_time;
 
 	struct sk_buff_head res_q;
 	wait_queue_head_t wait;
@@ -1391,7 +1392,9 @@ mt76_mcu_msg_alloc(struct mt76_dev *dev, const void *data,
 
 void mt76_mcu_rx_event(struct mt76_dev *dev, struct sk_buff *skb);
 struct sk_buff *mt76_mcu_get_response(struct mt76_dev *dev,
-				      unsigned long expires);
+				      unsigned long expires, int cmd);
+bool mt76_get_test_mcu_restart(void);
+void mt76_set_test_mcu_restart(bool ok);
 int mt76_mcu_send_and_get_msg(struct mt76_dev *dev, int cmd, const void *data,
 			      int len, bool wait_resp, struct sk_buff **ret);
 int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,

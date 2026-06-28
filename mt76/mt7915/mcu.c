@@ -150,6 +150,7 @@ mt7915_mcu_set_sta_ht_mcs(struct ieee80211_sta *sta, u8 *ht_mcs,
 		ht_mcs[nss] = sta->deflink.ht_cap.mcs.rx_mask[nss] & mask[nss];
 }
 
+static int mt7915_firmware_state(struct mt7915_dev *dev, bool wa);
 static int
 mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 			  struct sk_buff *skb, int seq)
@@ -183,7 +184,17 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 	} else {
 		skb_pull(skb, sizeof(struct mt76_connac2_mcu_rxd));
 	}
-
+/* after calling __mt76_mcu_restart(mdev), the whole system will be shutdown?
+	if (mt76_get_test_mcu_restart()) {
+               if (!mt7915_firmware_state(dev, true)) { // firmware must be ready !
+			skb_queue_purge(&mdev->mcu.res_q);
+			dev_err(mdev->dev, "====== skb_queue_purge");
+			__mt76_mcu_restart(mdev);
+			dev_err(mdev->dev, "====== __mt76_mcu_restart");
+                }
+	       mt76_set_test_mcu_restart(false);
+	}
+*/
 	return ret;
 }
 

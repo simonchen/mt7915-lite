@@ -32,7 +32,7 @@ do {									\
         struct wait_queue_entry __wq_entry;                                     \
         long __ret = ret;       /* explicit shadow */                           \
 	unsigned long __end = jiffies + (ret);					\
-	unsigned int wq_flags = (cmd == MCU_EXT_CMD(GET_MIB_INFO)) ? WQ_FLAG_EXCLUSIVE : 0; \
+	unsigned int wq_flags = (exclusive || (cmd == MCU_EXT_CMD(GET_MIB_INFO))) ? WQ_FLAG_EXCLUSIVE : 0; \
 										\
         init_wait_entry(&__wq_entry, wq_flags);					\
         for (;;) {                                                              \
@@ -54,17 +54,17 @@ do {									\
 __out:  __ret;                                                                  \
 })
 
-#define __mt76_wait_event_timeout(wq_head, condition, timeout)			\
+#define __mt76_wait_event_timeout(wq_head, condition, timeout, exclusive)	\
 	___mt76_wait_event(wq_head, ___wait_cond_timeout(condition),		\
-		      TASK_UNINTERRUPTIBLE, 0, timeout,				\
+		      TASK_UNINTERRUPTIBLE, exclusive, timeout,			\
 		      cond_resched())
 
-#define mt76_wait_event_timeout(wq_head, condition, timeout)                    \
+#define mt76_wait_event_timeout(wq_head, condition, timeout, exclusive)         \
 ({                                                                              \
         long __ret = timeout;                                                   \
         might_sleep();                                                          \
         if (!___wait_cond_timeout(condition))                                   \
-                __ret = __mt76_wait_event_timeout(wq_head, condition, timeout); \
+                __ret = __mt76_wait_event_timeout(wq_head, condition, timeout, exclusive); \
         __ret;                                                                  \
 })
 
@@ -93,9 +93,10 @@ __mt76_mcu_msg_alloc(struct mt76_dev *dev, const void *data,
 EXPORT_SYMBOL_GPL(__mt76_mcu_msg_alloc);
 
 struct sk_buff *mt76_mcu_get_response(struct mt76_dev *dev,
-				      unsigned long expires)
+				      unsigned long expires, int cmd)
 {
 	unsigned long timeout;
+	int is_ext_cmd = ((cmd & __MCU_CMD_FIELD_ID) == MCU_CMD_EXT_CID);
 
 	if (!time_is_after_jiffies(expires))
 		return NULL;
@@ -104,10 +105,22 @@ struct sk_buff *mt76_mcu_get_response(struct mt76_dev *dev,
 	mt76_wait_event_timeout(dev->mcu.wait,
 			   (!skb_queue_empty(&dev->mcu.res_q) ||
 			    test_bit(MT76_MCU_RESET, &dev->phy.state)),
-			   timeout);
+			   timeout, is_ext_cmd);
 	return skb_dequeue(&dev->mcu.res_q);
 }
 EXPORT_SYMBOL_GPL(mt76_mcu_get_response);
+
+bool mt76_get_test_mcu_restart(void)
+{
+	return rx_poll_retry_enable;
+}
+EXPORT_SYMBOL_GPL(mt76_get_test_mcu_restart);
+
+void mt76_set_test_mcu_restart(bool ok)
+{
+	rx_poll_retry_enable = ok;
+}
+EXPORT_SYMBOL_GPL(mt76_set_test_mcu_restart);
 
 void mt76_mcu_rx_event(struct mt76_dev *dev, struct sk_buff *skb)
 {
@@ -144,6 +157,14 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
 
 	mutex_lock(&dev->mcu.mutex);
 
+	//if (MCU_EXT_CMD_GET_MIB_INFO == (FIELD_GET(__MCU_CMD_FIELD_EXT_ID, cmd)) && 
+	if (dev->mcu.mib_access_time > 0 && 
+			time_after(dev->mcu.mib_access_time + HZ/10, jiffies)) {
+		ret = -EBUSY; 
+		dev_kfree_skb(skb);
+		goto out;
+	}
+
 	ret = dev->mcu_ops->mcu_skb_send_msg(dev, skb, cmd, &seq);
 	if (ret < 0) {
 		dev_kfree_skb(skb);
@@ -161,15 +182,17 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
 	expires = jiffies + dev->mcu.timeout;
 
 	do {
-		skb = mt76_mcu_get_response(dev, expires);
+		skb = mt76_mcu_get_response(dev, expires, cmd);
 		ret = dev->mcu_ops->mcu_parse_response(dev, cmd, skb, seq);
 		if (!ret && ret_skb)
 			*ret_skb = skb;
 		else
 			dev_kfree_skb(skb);
-	} while (ret == -EAGAIN && (cmd != MCU_EXT_CMD(GET_MIB_INFO)));
+	} while (ret == -EAGAIN && cmd != MCU_EXT_CMD(GET_MIB_INFO));
 
 out:
+//	if (MCU_EXT_CMD_GET_MIB_INFO == (FIELD_GET(__MCU_CMD_FIELD_EXT_ID, cmd)))
+		dev->mcu.mib_access_time = jiffies; // save the last MIB access time
 	mutex_unlock(&dev->mcu.mutex);
 
 	return ret;
