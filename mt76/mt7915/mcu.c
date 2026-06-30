@@ -2470,19 +2470,69 @@ int mt7915_mcu_init_firmware(struct mt7915_dev *dev)
 				 MCU_WA_PARAM_RED, 0, 0);
 }
 
+#define MCU_REFUSE_INTERVAL	2000000 //us
+#define MCU_MIN_INTERVAL	120000 //us
+#define MCU_MAX_INTERVAL	200000 //us
+bool mt7915_mcu_limit_rate(struct mt76_dev *mdev, int cmd)
+{
+	bool ret = false;
+
+	struct mt7915_dev *dev = container_of(mdev, struct mt7915_dev, mt76);
+	if (dev && !dev->recovery.hw_init_done)
+		return ret;
+
+        if (mdev->mcu.last_access_time > 0 &&
+		(cmd != MCU_EXT_CMD(GET_MIB_INFO)) &&
+		(ktime_get_mono_fast_ns() - mdev->mcu.last_access_time) < MCU_MIN_INTERVAL*1000) {
+		u64 __end_ns = ktime_get_mono_fast_ns() + MCU_MIN_INTERVAL*1000;
+#ifndef CONFIG_PREEMPTION
+		int sleep_us = (MCU_MIN_INTERVAL < 100) ? MCU_MIN_INTERVAL : 100;
+		for (;;) {
+			if ((ktime_get_mono_fast_ns() - __end_ns) >= 0)
+				break;
+
+			udelay(sleep_us);
+			cond_resched();
+		}
+#endif
+	}
+
+	if (mdev->mcu.mib_access_time > 0 && 
+		(cmd == MCU_EXT_CMD(GET_MIB_INFO)) &&
+		(ktime_get_mono_fast_ns() - mdev->mcu.mib_access_time) < MCU_REFUSE_INTERVAL*1000) {
+		ret = true;
+	}
+
+	return ret;
+}
+
+void mt7915_mcu_access_time_update(struct mt76_dev *mdev, int cmd)
+{
+	if (cmd == MCU_EXT_CMD(GET_MIB_INFO))
+	        mdev->mcu.mib_access_time = ktime_get_mono_fast_ns(); // save the last MIB access time
+	else
+		mdev->mcu.last_access_time = ktime_get_mono_fast_ns();
+}
+
 int mt7915_mcu_init(struct mt7915_dev *dev)
 {
+	int ret;
+
 	static const struct mt76_mcu_ops mt7915_mcu_ops = {
 		.headroom = sizeof(struct mt76_connac2_mcu_txd),
 		.mcu_skb_send_msg = mt7915_mcu_send_message,
 		.mcu_parse_response = mt7915_mcu_parse_response,
 		.mcu_restart = mt76_connac_mcu_restart,
 		.mcu_set_timeout = mt7915_mcu_set_timeout,
+		.mcu_limit_rate = mt7915_mcu_limit_rate,
+		.mcu_access_time_update = mt7915_mcu_access_time_update,
 	};
 
 	dev->mt76.mcu_ops = &mt7915_mcu_ops;
 
-	return mt7915_mcu_init_firmware(dev);
+	ret = mt7915_mcu_init_firmware(dev);
+
+	return ret;
 }
 
 void mt7915_mcu_exit(struct mt7915_dev *dev)
@@ -3127,6 +3177,8 @@ int mt7915_mcu_get_chan_mib_info(struct mt7915_phy *phy, bool chan_switch)
 	static const u32 *offs;
 	int i, ret, len, offs_cc;
 	u64 cc_tx;
+
+        return 0; // firmware bug. return directly
 
 	/* strict order */
 	if (is_mt7915(&dev->mt76)) {

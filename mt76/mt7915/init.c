@@ -415,6 +415,8 @@ mt7915_init_wiphy(struct mt7915_phy *phy)
 				   "mediatek,disable-radar-background"))
 		wiphy_ext_feature_set(wiphy,
 				      NL80211_EXT_FEATURE_RADAR_BACKGROUND);
+	else
+		dev_err(mdev->dev, "====== MT7915: mediatek,disable-radar-background @%s\n", __func__);
 
 	/*if (profile_has_rate_control(mdev->dev)) {
 		ieee80211_hw_set(hw, HAS_RATE_CONTROL);
@@ -428,7 +430,7 @@ mt7915_init_wiphy(struct mt7915_phy *phy)
 	hw->max_tx_fragments = 4;
 
 	if (!phy->dev->dbdc_support)
-		wiphy->txq_memory_limit = 32 << 20; /* 32 MiB */
+		wiphy->txq_memory_limit = 36 << 20; /* 36 MiB */
 
 	if (phy->mt76->cap.has_2ghz) {
 		phy->mt76->sband_2g.sband.ht_cap.cap |=

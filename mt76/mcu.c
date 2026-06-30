@@ -157,12 +157,12 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
 
 	mutex_lock(&dev->mcu.mutex);
 
-	//if (MCU_EXT_CMD_GET_MIB_INFO == (FIELD_GET(__MCU_CMD_FIELD_EXT_ID, cmd)) && 
-	if (dev->mcu.mib_access_time > 0 && 
-			time_after(dev->mcu.mib_access_time + HZ/10, jiffies)) {
-		ret = -EBUSY; 
-		dev_kfree_skb(skb);
-		goto out;
+	if (dev->mcu_ops->mcu_limit_rate) {
+		if (dev->mcu_ops->mcu_limit_rate(dev, cmd)) {
+			ret = -EBUSY; 
+			dev_kfree_skb(skb);
+			goto out;
+		}
 	}
 
 	ret = dev->mcu_ops->mcu_skb_send_msg(dev, skb, cmd, &seq);
@@ -191,8 +191,9 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
 	} while (ret == -EAGAIN && cmd != MCU_EXT_CMD(GET_MIB_INFO));
 
 out:
-//	if (MCU_EXT_CMD_GET_MIB_INFO == (FIELD_GET(__MCU_CMD_FIELD_EXT_ID, cmd)))
-		dev->mcu.mib_access_time = jiffies; // save the last MIB access time
+	if (dev->mcu_ops->mcu_access_time_update)
+		dev->mcu_ops->mcu_access_time_update(dev, cmd);
+
 	mutex_unlock(&dev->mcu.mutex);
 
 	return ret;

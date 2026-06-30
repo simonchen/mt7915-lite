@@ -223,7 +223,9 @@ struct mt76_mcu_ops {
 	int (*mcu_rd_rp)(struct mt76_dev *dev, u32 base,
 			 struct mt76_reg_pair *rp, int len);
 	int (*mcu_restart)(struct mt76_dev *dev);
-	void (*mcu_set_timeout)(struct mt76_dev *mdev, int cmd);
+	void (*mcu_set_timeout)(struct mt76_dev *dev, int cmd);
+	bool (*mcu_limit_rate)(struct mt76_dev *dev, int cmd);
+	void (*mcu_access_time_update)(struct mt76_dev *dev, int cmd);
 };
 
 struct mt76_queue_ops {
@@ -525,7 +527,8 @@ struct mt76_mcu {
 	struct mutex mutex;
 	u32 msg_seq;
 	int timeout;
-        unsigned long mib_access_time;
+	u64 last_access_time;
+        u64 mib_access_time;
 
 	struct sk_buff_head res_q;
 	wait_queue_head_t wait;
