@@ -203,7 +203,7 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 static void
 mt7915_mcu_set_timeout(struct mt76_dev *mdev, int cmd)
 {
-	mdev->mcu.timeout = 5 * HZ;
+	mdev->mcu.timeout = 300 * HZ;
 
 	if ((cmd & __MCU_CMD_FIELD_ID) != MCU_CMD_EXT_CID)
 		return;
@@ -214,7 +214,7 @@ mt7915_mcu_set_timeout(struct mt76_dev *mdev, int cmd)
 	case MCU_EXT_CMD_PHY_STAT_INFO:
 	case MCU_EXT_CMD_STA_REC_UPDATE:
 	case MCU_EXT_CMD_BSS_INFO_UPDATE:
-		mdev->mcu.timeout = 2 * HZ;
+		mdev->mcu.timeout = 120 * HZ;
 		return;
 	default:
 		break;
@@ -2471,7 +2471,7 @@ int mt7915_mcu_init_firmware(struct mt7915_dev *dev)
 }
 
 #define MCU_REFUSE_INTERVAL	2000000 //us
-#define MCU_MIN_INTERVAL	120000 //us
+#define MCU_MIN_INTERVAL	100000 //us
 #define MCU_MAX_INTERVAL	200000 //us
 bool mt7915_mcu_limit_rate(struct mt76_dev *mdev, int cmd)
 {
