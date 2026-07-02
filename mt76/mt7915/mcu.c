@@ -2,6 +2,7 @@
 /* Copyright (C) 2020 MediaTek Inc. */
 
 #include <linux/fs.h>
+#include <linux/nmi.h>
 #include "mt7915.h"
 #include "mcu.h"
 #include "mac.h"
@@ -168,6 +169,8 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 		wake_up(&dev->mt76.mcu.wait);
 		queue_work(dev->mt76.wq, &dev->reset_work);
 		wake_up(&dev->reset_wait);*/
+		dev_err(mdev->dev, "MT7915: MCU 120s timeout! Firmware is completely dead. Panic now!\n");
+		panic("mt7915: Crucial MCU command %08x timed out for 120s. System forced restart.\n", cmd);
 		return -ETIMEDOUT;
 	}
 
@@ -2484,15 +2487,20 @@ bool mt7915_mcu_limit_rate(struct mt76_dev *mdev, int cmd)
         if (mdev->mcu.last_access_time > 0 &&
 		(cmd != MCU_EXT_CMD(GET_MIB_INFO)) &&
 		(ktime_get_mono_fast_ns() - mdev->mcu.last_access_time) < MCU_MIN_INTERVAL*1000) {
-		u64 __end_ns = ktime_get_mono_fast_ns() + MCU_MIN_INTERVAL*1000;
+		int cnt = 0; u64 __end_ns = ktime_get_mono_fast_ns() + MCU_MIN_INTERVAL*1000;
 #ifndef CONFIG_PREEMPTION
 		int sleep_us = (MCU_MIN_INTERVAL < 100) ? MCU_MIN_INTERVAL : 100;
+		static unsigned long last_watchdog = 0;
 		for (;;) {
 			if ((ktime_get_mono_fast_ns() - __end_ns) >= 0)
 				break;
 
 			udelay(sleep_us);
-			cond_resched();
+			if (cnt++ == 10) { cond_resched(); cnt = 0; }
+		}
+		if (time_after(jiffies, last_watchdog+HZ)){
+			touch_nmi_watchdog();
+			last_watchdog = jiffies;
 		}
 #endif
 	}
