@@ -7,6 +7,8 @@
 #define __MT76_H
 
 #include <linux/kernel.h>
+#include <linux/wait.h>
+#include <linux/rcupdate.h>
 #include <linux/io.h>
 #include <linux/spinlock.h>
 #include <linux/skbuff.h>
@@ -523,15 +525,59 @@ enum mt76u_out_ep {
 	__MT_EP_OUT_MAX,
 };
 
+#define ___mt76_wait_event(wq_head, condition, state, exclusive, ret, cmd)      \
+({                                                                              \
+        __label__ __out;                                                        \
+        struct wait_queue_entry __wq_entry;                                     \
+        long __ret = ret;       /* explicit shadow */                           \
+        unsigned long __end = jiffies + (ret);                                  \
+	unsigned int wq_flags = (exclusive || (cmd == MCU_EXT_CMD(GET_MIB_INFO))) ? WQ_FLAG_EXCLUSIVE : 0; \
+                                                                                \
+        init_wait_entry(&__wq_entry, wq_flags);                                 \
+        for (;;) {                                                              \
+                long __int = prepare_to_wait_event(&wq_head, &__wq_entry, state);\
+                                                                                \
+                if (condition)                                                  \
+                        break;                                                  \
+                if (time_after_eq(jiffies, __end))                              \
+                        break;                                                  \
+                                                                                \
+                if (___wait_is_interruptible(state) && __int) {                 \
+                        __ret = __int;                                          \
+                        goto __out;                                             \
+                }                                                               \
+                                                                                \
+                cmd;                                                            \
+        }                                                                       \
+        finish_wait(&wq_head, &__wq_entry);                                     \
+	rcu_all_qs();								\
+__out:  __ret;                                                                  \
+})
+
+#define __mt76_wait_event_timeout(wq_head, condition, timeout, exclusive)       \
+        ___mt76_wait_event(wq_head, ___wait_cond_timeout(condition),            \
+                      TASK_UNINTERRUPTIBLE, exclusive, timeout,                 \
+                      cond_resched())
+
+#define mt76_wait_event_timeout(wq_head, condition, timeout, exclusive)         \
+({                                                                              \
+        long __ret = timeout;                                                   \
+        might_sleep();                                                          \
+        if (!___wait_cond_timeout(condition))                                   \
+                __ret = __mt76_wait_event_timeout(wq_head, condition, timeout, exclusive); \
+        __ret;                                                                  \
+})
+
 struct mt76_mcu {
 	struct mutex mutex;
 	u32 msg_seq;
 	int timeout;
-	u64 last_access_time;
-        u64 mib_access_time;
+	unsigned long last_access_time;
+        unsigned long mib_access_time;
 
 	struct sk_buff_head res_q;
 	wait_queue_head_t wait;
+	wait_queue_head_t delay;
 };
 
 #define MT_TX_SG_MAX_SIZE	8

@@ -960,6 +960,8 @@ rev_dma:
 
 	rcu_read_unlock();
 
+	//cond_resched(); // rcu update
+
 	if (done < budget && napi_complete_done(napi, done)) {
 		if (done) wmb(); // sync. cpu write
 		dev->drv->rx_poll_complete(dev, qid);

@@ -2474,9 +2474,9 @@ int mt7915_mcu_init_firmware(struct mt7915_dev *dev)
 				 MCU_WA_PARAM_RED, 0, 0);
 }
 
-#define MCU_REFUSE_INTERVAL	2000000 //us
-#define MCU_MIN_INTERVAL	100000 //us
-#define MCU_MAX_INTERVAL	200000 //us
+#define MCU_REFUSE_INTERVAL	HZ*2 /*2secs*/
+#define MCU_MIN_INTERVAL	HZ/10 /*100ms*/
+#define MCU_MAX_INTERVAL	HZ/5 /*200ms*/
 bool mt7915_mcu_limit_rate(struct mt76_dev *mdev, int cmd)
 {
 	bool ret = false;
@@ -2487,18 +2487,25 @@ bool mt7915_mcu_limit_rate(struct mt76_dev *mdev, int cmd)
 
         if (mdev->mcu.last_access_time > 0 &&
 		(cmd != MCU_EXT_CMD(GET_MIB_INFO)) &&
-		(ktime_get_mono_fast_ns() - mdev->mcu.last_access_time) < MCU_MIN_INTERVAL*1000) {
-		u64 __end_ns = ktime_get_mono_fast_ns() + MCU_MIN_INTERVAL*1000;
+		(jiffies - mdev->mcu.last_access_time) < MCU_MIN_INTERVAL) {
+		unsigned long __end = jiffies + (MCU_MIN_INTERVAL - jiffies + mdev->mcu.last_access_time);
 #ifndef CONFIG_PREEMPTION
-		int sleep_us = (MCU_MIN_INTERVAL < 1000) ? MCU_MIN_INTERVAL : 1000;
+		int sleep_interval = (MCU_MIN_INTERVAL < 1) ? MCU_MIN_INTERVAL : 1;
 		static unsigned long last_watchdog = 0;
-		/*for (;;) {
-			if ((ktime_get_mono_fast_ns() - __end_ns) >= 0)
+		for (;;) {
+			if ((jiffies - __end) >= 0)
 				break;
 
-			udelay(sleep_us);
+			//udelay(sleep_us);
+			//cond_resched();
+			//set_current_state(TASK_INTERRUPTIBLE);
+			//schedule_timeout(usecs_to_jiffies(sleep_us)); 
+			smp_mb();
+			wait_event_timeout(mdev->mcu.delay, ((jiffies - __end) >= 0), sleep_interval);
 			cond_resched();
-		}*/wait_event_timeout(mdev->mcu.wait, ((ktime_get_mono_fast_ns() - __end_ns) >= 0), usecs_to_jiffies(MCU_MIN_INTERVAL)); rcu_all_qs();
+		}
+		smp_mb();
+		cond_resched();
 		if (time_after(jiffies, last_watchdog+HZ)){
 			touch_nmi_watchdog();
 			last_watchdog = jiffies;
@@ -2508,7 +2515,7 @@ bool mt7915_mcu_limit_rate(struct mt76_dev *mdev, int cmd)
 
 	if (mdev->mcu.mib_access_time > 0 && 
 		(cmd == MCU_EXT_CMD(GET_MIB_INFO)) &&
-		(ktime_get_mono_fast_ns() - mdev->mcu.mib_access_time) < MCU_REFUSE_INTERVAL*1000) {
+		(jiffies - mdev->mcu.mib_access_time) < MCU_REFUSE_INTERVAL) {
 		ret = true;
 	}
 
@@ -2518,9 +2525,9 @@ bool mt7915_mcu_limit_rate(struct mt76_dev *mdev, int cmd)
 void mt7915_mcu_access_time_update(struct mt76_dev *mdev, int cmd)
 {
 	if (cmd == MCU_EXT_CMD(GET_MIB_INFO))
-	        mdev->mcu.mib_access_time = ktime_get_mono_fast_ns(); // save the last MIB access time
+	        mdev->mcu.mib_access_time = jiffies; // save the last MIB access time
 	else
-		mdev->mcu.last_access_time = ktime_get_mono_fast_ns();
+		mdev->mcu.last_access_time = jiffies;
 }
 
 int mt7915_mcu_init(struct mt7915_dev *dev)

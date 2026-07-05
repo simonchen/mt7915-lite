@@ -3,8 +3,6 @@
  * Copyright (C) 2019 Lorenzo Bianconi <lorenzo.bianconi83@gmail.com>
  */
 
-#include <linux/wait.h>
-#include <linux/rcupdate.h>
 #include "mt76.h"
 #include "mt76_connac_mcu.h"
 
@@ -25,48 +23,6 @@ do {									\
 	}								\
 } while (0)
 */
-
-#define ___mt76_wait_event(wq_head, condition, state, exclusive, ret, cmd)      \
-({                                                                              \
-        __label__ __out;                                                        \
-        struct wait_queue_entry __wq_entry;                                     \
-        long __ret = ret;       /* explicit shadow */                           \
-	unsigned long __end = jiffies + (ret);					\
-	unsigned int wq_flags = (exclusive || (cmd == MCU_EXT_CMD(GET_MIB_INFO))) ? WQ_FLAG_EXCLUSIVE : 0; \
-										\
-        init_wait_entry(&__wq_entry, wq_flags);					\
-        for (;;) {                                                              \
-                long __int = prepare_to_wait_event(&wq_head, &__wq_entry, state);\
-                                                                                \
-                if (condition)                                                  \
-                        break;                                                  \
-		if (time_after_eq(jiffies, __end))				\
-			break;							\
-                                                                                \
-                if (___wait_is_interruptible(state) && __int) {                 \
-                        __ret = __int;                                          \
-                        goto __out;                                             \
-                }                                                               \
-                                                                                \
-                cmd;                                                            \
-        }                                                                       \
-        finish_wait(&wq_head, &__wq_entry);                                     \
-__out:  __ret;                                                                  \
-})
-
-#define __mt76_wait_event_timeout(wq_head, condition, timeout, exclusive)	\
-	___mt76_wait_event(wq_head, ___wait_cond_timeout(condition),		\
-		      TASK_UNINTERRUPTIBLE, exclusive, timeout,			\
-		      cond_resched())
-
-#define mt76_wait_event_timeout(wq_head, condition, timeout, exclusive)         \
-({                                                                              \
-        long __ret = timeout;                                                   \
-        might_sleep();                                                          \
-        if (!___wait_cond_timeout(condition))                                   \
-                __ret = __mt76_wait_event_timeout(wq_head, condition, timeout, exclusive); \
-        __ret;                                                                  \
-})
 
 struct sk_buff *
 __mt76_mcu_msg_alloc(struct mt76_dev *dev, const void *data,
@@ -155,15 +111,15 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
 	if (ret_skb)
 		*ret_skb = NULL;
 
-	mutex_lock(&dev->mcu.mutex);
+        mutex_lock(&dev->mcu.mutex);
 
-	if (dev->mcu_ops->mcu_limit_rate) {
-		if (dev->mcu_ops->mcu_limit_rate(dev, cmd)) {
-			ret = -EBUSY; 
-			dev_kfree_skb(skb);
-			goto out;
-		}
+#ifdef CONFIG_MIPS
+	rmb();
+	if (unlikely(!skb)) {
+		dev_err(dev->dev, "Invalid skb\n");
+		goto out;
 	}
+#endif
 
 	ret = dev->mcu_ops->mcu_skb_send_msg(dev, skb, cmd, &seq);
 	if (ret < 0) {
@@ -191,8 +147,12 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
 	} while (ret == -EAGAIN && cmd != MCU_EXT_CMD(GET_MIB_INFO));
 
 out:
-	if (dev->mcu_ops->mcu_access_time_update)
-		dev->mcu_ops->mcu_access_time_update(dev, cmd);
+	if (dev->mcu_ops->mcu_limit_rate) {
+		dev->mcu_ops->mcu_limit_rate(dev, cmd);
+	}
+	
+        if (dev->mcu_ops->mcu_access_time_update)
+                dev->mcu_ops->mcu_access_time_update(dev, cmd);
 
 	mutex_unlock(&dev->mcu.mutex);
 

@@ -1263,14 +1263,16 @@ mt76_check_sta(struct mt76_dev *dev, struct sk_buff *skb)
 }
 
 void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
-		      struct napi_struct *napi)
+		      struct napi_struct *napi, enum mt76_rxq_id qid)
 {
 	struct ieee80211_sta *sta;
 	struct ieee80211_hw *hw;
 	struct sk_buff *skb, *tmp;
 	LIST_HEAD(list);
 
-	spin_lock(&dev->rx_lock);
+	//spin_lock(&dev->rx_lock);
+	if (napi)
+		spin_lock(&dev->q_rx[qid].lock);
 	while ((skb = __skb_dequeue(frames)) != NULL) {
 		struct sk_buff *nskb = skb_shinfo(skb)->frag_list;
 
@@ -1289,7 +1291,10 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 			ieee80211_rx_list(hw, sta, skb, &list);
 		}
 	}
-	spin_unlock(&dev->rx_lock);
+	//spin_unlock(&dev->rx_lock);
+	smp_mb(); 
+	if (napi)
+		spin_unlock(&dev->q_rx[qid].lock);
 
 	if (!napi) {
 		netif_receive_skb_list(&list);
@@ -1351,7 +1356,7 @@ void mt76_rx_poll_complete(struct mt76_dev *dev, enum mt76_rxq_id q,
 		queue_work(system_unbound_wq, &last_tid->reorder_work.work);
         }
 
-	mt76_rx_complete(dev, &frames, napi);
+	mt76_rx_complete(dev, &frames, napi, q);
 }
 EXPORT_SYMBOL_GPL(mt76_rx_poll_complete);
 

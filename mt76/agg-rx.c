@@ -96,6 +96,7 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 	struct mt76_dev *dev = tid->dev;
 	struct sk_buff_head frames;
 	bool has_frames;
+	enum mt76_rxq_id qid = MT_RXQ_MAIN;
 	//int nframes;
 
 	__skb_queue_head_init(&frames);
@@ -132,8 +133,13 @@ mt76_rx_aggr_reorder_work(struct work_struct *work)
 		}
 	}
 */
-	if (has_frames)
-		mt76_rx_complete(dev, &frames, NULL);
+	if (has_frames) {
+		struct sk_buff *first_skb = skb_peek(&frames);
+		if (first_skb) {
+			qid = (enum mt76_rxq_id)skb_get_rx_queue(first_skb);
+		}
+		mt76_rx_complete(dev, &frames, NULL, qid);
+	}
 
 	rcu_read_unlock();
 	local_bh_enable();
