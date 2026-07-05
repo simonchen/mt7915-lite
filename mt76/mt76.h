@@ -550,7 +550,7 @@ enum mt76u_out_ep {
                 cmd;                                                            \
         }                                                                       \
         finish_wait(&wq_head, &__wq_entry);                                     \
-	rcu_all_qs();								\
+	smp_mb(); rcu_all_qs();							\
 __out:  __ret;                                                                  \
 })
 

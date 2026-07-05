@@ -114,7 +114,7 @@ int mt76_mcu_skb_send_and_get_msg(struct mt76_dev *dev, struct sk_buff *skb,
         mutex_lock(&dev->mcu.mutex);
 
 #ifdef CONFIG_MIPS
-	rmb();
+	smp_rmb();
 	if (unlikely(!skb)) {
 		dev_err(dev->dev, "Invalid skb\n");
 		goto out;
