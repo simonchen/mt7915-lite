@@ -3194,7 +3194,7 @@ int mt7915_mcu_get_chan_mib_info(struct mt7915_phy *phy, bool chan_switch)
 	int i, ret, len, offs_cc;
 	u64 cc_tx;
 
-        return 0; // firmware bug. return directly
+        //return 0; // firmware bug. return directly
 
 	/* strict order */
 	if (is_mt7915(&dev->mt76)) {
