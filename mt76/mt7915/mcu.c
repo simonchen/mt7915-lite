@@ -171,7 +171,7 @@ mt7915_mcu_parse_response(struct mt76_dev *mdev, int cmd,
 		queue_work(dev->mt76.wq, &dev->reset_work);
 		wake_up(&dev->reset_wait);*/
 		dev_err(mdev->dev, "MT7915: MCU 120s timeout! Firmware is completely dead. Panic now!\n");
-		panic("mt7915: Crucial MCU command %08x timed out for 120s. System forced restart.\n", cmd);
+		mdelay(50); panic("mt7915: Crucial MCU command %08x timed out for 120s. System forced restart.\n", cmd);
 		return -ETIMEDOUT;
 	}
 
@@ -421,7 +421,7 @@ static void mt7915_mcu_rx_ps_sync(struct mt7915_dev *dev, struct sk_buff *skb)
 	/* Don't report PS MODE to kernel stack
 	 * Instead, only process beacon queues on tx.c
 	 */
-	//ieee80211_sta_ps_transition_ni(sta, is_ps);
+	ieee80211_sta_ps_transition_ni(sta, is_ps);
 
 out:
 	rcu_read_unlock();
@@ -3194,7 +3194,7 @@ int mt7915_mcu_get_chan_mib_info(struct mt7915_phy *phy, bool chan_switch)
 	int i, ret, len, offs_cc;
 	u64 cc_tx;
 
-        //return 0; // firmware bug. return directly
+        return 0; // firmware bug. return directly
 
 	/* strict order */
 	if (is_mt7915(&dev->mt76)) {
