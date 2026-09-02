@@ -946,7 +946,17 @@ int mt76_dma_rx_poll(struct napi_struct *napi, int budget)
 	int retry_limit = (!rx_poll_retry_enable) ? 0 : atomic_read(&rx_poll_retry_cnt); 
 	u64 start_jif = ktime_get();
 
+	if (unlikely(!napi || !virt_addr_valid(napi) || !virt_addr_valid(napi->dev))) {
+		pr_err_ratelimited("mt76: FATAL! napi or napi->dev pointer is invalid VA!\n");
+		return 0;
+	}
+
 	dev = container_of(napi->dev, struct mt76_dev, napi_dev);
+	if (unlikely(!virt_addr_valid(dev))) {
+		pr_err_ratelimited("mt76: FATAL! dev pointer is invalid VA: %p, napi: %p\n", dev, napi);
+		return 0;
+	}
+
 	qid = napi - dev->napi;
 
 rev_dma:
@@ -960,20 +970,19 @@ rev_dma:
 
 	rcu_read_unlock();
 
-	//cond_resched(); // rcu update
-
 	if (done < budget && napi_complete_done(napi, done)) {
-		if (done) wmb(); // sync. cpu write
+		if (done) mb(); // sync. cpu cores & I/O
 		dev->drv->rx_poll_complete(dev, qid);
 		if (rx_poll_retry_enable) mt76_rx_poll_retry_adjust(start_jif);
-		udelay(1); return done;
+		mt76_delay_yield(2); return done;
 	}else if (--retry_limit >= 0) {
 		if (rx_poll_retry_enable) mt76_rx_poll_retry_adjust(start_jif);
 		done = 0;
-		udelay(1); goto rev_dma;
+		mt76_delay_yield(2); goto rev_dma;
 	}
 
 	if (rx_poll_retry_enable) mt76_rx_poll_retry_adjust(start_jif);
+	//if (done) mb();
 	return done;
 }
 EXPORT_SYMBOL_GPL(mt76_dma_rx_poll);

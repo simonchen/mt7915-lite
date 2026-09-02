@@ -525,6 +525,14 @@ enum mt76u_out_ep {
 	__MT_EP_OUT_MAX,
 };
 
+#define mt76_delay_yield(iterations) do { \
+    int __i; \
+    for (__i = 0; __i < (iterations); __i++) { \
+        udelay(1); \
+        cond_resched(); \
+    } \
+} while (0)
+
 #define ___mt76_wait_event(wq_head, condition, state, exclusive, ret, cmd)      \
 ({                                                                              \
         __label__ __out;                                                        \

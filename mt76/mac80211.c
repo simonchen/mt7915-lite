@@ -1299,7 +1299,7 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 		}
 	}
 	//spin_unlock(&dev->rx_lock);
-	smp_mb(); 
+	smp_mb(); udelay(1); 
 	if (napi)
 		spin_unlock(&dev->q_rx[qid].lock);
 
@@ -1310,6 +1310,15 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 
 	list_for_each_entry_safe(skb, tmp, &list, list) {
 		skb_list_del_init(skb);
+		if (unlikely(!skb || !virt_addr_valid(skb))) {
+			pr_err_ratelimited("mt76: FATAL! In-flight skb pointer itself is invalid VA! Skipping safely.\n");
+			continue;
+		}
+		if (unlikely(skb->dev && !virt_addr_valid(skb->dev))) {
+			pr_err_ratelimited("mt76: FATAL! In-flight skb->dev is corrupted (invalid VA), dropping packet!\n");
+			dev_kfree_skb(skb);
+			continue;
+		}
 		napi_gro_receive(napi, skb);
 	}
 }
