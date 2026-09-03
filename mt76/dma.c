@@ -599,6 +599,7 @@ mt76_dma_rx_fill(struct mt76_dev *dev, struct mt76_queue *q)
 		struct mt76_queue_buf qbuf;
 		void *buf = NULL;
 
+		smp_mb();
 		buf = page_frag_alloc(&q->rx_page, q->buf_size, GFP_ATOMIC|GFP_DMA);
 		if (!buf)
 			break;

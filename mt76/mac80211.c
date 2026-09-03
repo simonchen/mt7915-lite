@@ -1299,11 +1299,11 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 		}
 	}
 	//spin_unlock(&dev->rx_lock);
-	smp_mb(); udelay(1); 
 	if (napi)
 		spin_unlock(&dev->q_rx[qid].lock);
 
 	if (!napi) {
+		smp_mb();
 		netif_receive_skb_list(&list);
 		return;
 	}
@@ -1319,6 +1319,7 @@ void mt76_rx_complete(struct mt76_dev *dev, struct sk_buff_head *frames,
 			dev_kfree_skb(skb);
 			continue;
 		}
+		smp_mb();
 		napi_gro_receive(napi, skb);
 	}
 }
