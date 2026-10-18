@@ -21,6 +21,7 @@ At the driver level, high-frequency, redundant polling operations for statistica
   - Real Hard-IRQ delay: DebugFS tweaking supported.
   - Descriptor Slimming: Reduced RX queues (8->5) and downsized/optimized the size of RX/TX_RING, MCU, and WTBL descriptors.
   - Thread Affinity: Hard-coded mt76-tx workqueue to CPU2 to avoid IPI drift.
+  - Dynamic configuration of hardware or software Minstrel rate control (/lib/firmware/mediatek/mt7915.cfg): For older Wi-Fi 4 network adapters (such as the Intel® Centrino® Advanced-N 6205), using software Minstrel rate control is recommended to ensure compatibility.
 
 ## Recommended Architecture (CPU Affinity)
   - CPU0/1/3: Bind NAPI POLL workqueues and user-space apps.
