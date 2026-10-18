@@ -540,7 +540,7 @@ define KernelPackage/mt7915-firmware/install
 		$(PKG_BUILD_DIR)/firmware_new/mt7915_wa.bin \
 		$(PKG_BUILD_DIR)/firmware_new/mt7915_wm.bin \
 		$(PKG_BUILD_DIR)/firmware_new/mt7915_rom_patch.bin \
-		$(PKG_BUILD_DIR)/firmware/mt7915.cfg \
+		$(PKG_BUILD_DIR)/firmware_new/mt7915.cfg \
 		$(1)/lib/firmware/mediatek
 endef
 
