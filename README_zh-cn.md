@@ -20,6 +20,7 @@ mt7915-lite 是针对 MediaTek MT7915 (Wi-Fi 6) 芯片的深度调优驱动分�
   - 硬中断（Hard-IRQ）真实延迟控制：支持通过 DebugFS 接口进行相关参数的微调与配置。
   - 描述符精简：减少了 RX 接收队列的数量（从8个缩减至5个），并对 RX/TX_RING、MCU 以及 WTBL 相关的描述符结构体进行了大小精简与优化。
   - 线程亲和性绑定：通过硬编码的方式，将 `mt76-tx` 工作队列（workqueue）强制绑定至 CPU2 核心运行，以此彻底杜绝因 IPI（处理器间中断）漂移现象所引发的性能不稳问题。
+  - 动态配置硬件或软件Minstrel速率控制(/lib/firmware/mediatek/mt7915.cfg): 对老旧wifi4网卡(例如 Intel® Centrino® Advanced-N 6205 ) 推荐用软件Minstrel速率控制，保证兼容性。
 
 ## 建议部署架构 (CPU亲和性)
   - CPU0/1/3：绑定 NAPI POLL 工作队列及用户空间应用程序。
